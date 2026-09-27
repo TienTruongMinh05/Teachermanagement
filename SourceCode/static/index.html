@@ -53,6 +53,10 @@
                 <!-- Login Alert Message -->
                 <div class="login-error-alert" id="loginErrorAlert" style="display: none;"></div>
             </div>
+
+            <div class="login-gate-footer">
+                <div>&copy; Trương Minh Tiến - Eastern International University</div>
+            </div>
         </div>
     </div>
 
@@ -1007,19 +1011,19 @@
         </div>
     </div>
 
-    <!-- GENERIC IN-APP CONFIRMATION MODAL -->
-    <div class="modal-overlay" id="genericConfirmModal">
+    <!-- IN-APP CONFIRMATION MODAL -->
+    <div class="modal-overlay" id="appConfirmModal" style="display: none;">
         <div class="modal-box" style="max-width: 440px;">
             <div class="modal-header">
-                <h3 class="modal-title" id="genericConfirmTitle">Xác nhận</h3>
-                <button class="btn-close-modal" id="btnCloseGenericConfirm">&times;</button>
+                <h3 class="modal-title" id="appConfirmTitle">Xác nhận</h3>
+                <button class="btn-close-modal" id="btnCloseAppConfirm">&times;</button>
             </div>
             <div class="modal-body">
-                <div id="genericConfirmMessage" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></div>
+                <p id="appConfirmMessage" style="font-size: 14px; color: var(--text-main); line-height: 1.6;"></p>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="btnCancelGenericConfirm">Hủy bỏ</button>
-                <button class="btn btn-primary" id="btnAcceptGenericConfirm">Xác nhận</button>
+                <button class="btn btn-secondary" id="btnCancelAppConfirm">Hủy bỏ</button>
+                <button class="btn btn-primary" id="btnOkAppConfirm">Đồng ý</button>
             </div>
         </div>
     </div>

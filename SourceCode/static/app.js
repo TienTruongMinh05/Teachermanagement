@@ -264,6 +264,14 @@ const el = {
     btnResetBellSchedule: document.getElementById('btnResetBellSchedule'),
     toastContainer: document.getElementById('toastContainer'),
 
+    // In-app Confirmation Modal
+    appConfirmModal: document.getElementById('appConfirmModal'),
+    appConfirmTitle: document.getElementById('appConfirmTitle'),
+    appConfirmMessage: document.getElementById('appConfirmMessage'),
+    btnCloseAppConfirm: document.getElementById('btnCloseAppConfirm'),
+    btnCancelAppConfirm: document.getElementById('btnCancelAppConfirm'),
+    btnOkAppConfirm: document.getElementById('btnOkAppConfirm'),
+
     // Exit & Shutdown
     btnTriggerExit: document.getElementById('btnTriggerExit'),
     exitConfirmModal: document.getElementById('exitConfirmModal'),
@@ -318,7 +326,7 @@ async function checkAuthAndInit() {
 
     // Adapt UI if running on Web
     if (state.authConfig && state.authConfig.is_web) {
-        if (el.btnOpenUploadModal) el.btnOpenUploadModal.style.display = 'none';
+        if (el.btnOpenUploadModal) el.btnOpenUploadModal.style.display = 'block';
         if (el.btnTriggerExit) el.btnTriggerExit.style.display = 'none';
         if (el.btnMenuLogout) el.btnMenuLogout.style.display = 'block';
     }
@@ -516,14 +524,14 @@ function applyAuthenticatedUser(user, token) {
 function handleLogout() {
     showInAppConfirm(
         'Xác nhận Đăng xuất',
-        'Thầy cô có chắc chắn muốn đăng xuất khỏi hệ thống giám sát thời khóa biểu?',
-        'Đăng xuất',
-        true,
+        'Thầy cô có chắc chắn muốn đăng xuất khỏi hệ thống?',
         () => {
             setStoredAuthToken('');
             state.currentUser = null;
             window.location.reload();
-        }
+        },
+        'btn-danger',
+        'Đăng xuất'
     );
 }
 
@@ -934,42 +942,30 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
-function showInAppConfirm(title, message, confirmText = 'Xác nhận', isDanger = false, onConfirm = () => {}) {
-    const modal = document.getElementById('genericConfirmModal');
-    if (!modal) {
-        if (confirm(message.replace(/<[^>]*>?/gm, ''))) onConfirm();
+let activeConfirmCallback = null;
+
+function showInAppConfirm(title, message, onConfirm, okButtonClass = 'btn-primary', okButtonText = 'Đồng ý') {
+    if (!el.appConfirmModal) {
+        if (window.confirm(message)) onConfirm();
         return;
     }
-    const titleEl = document.getElementById('genericConfirmTitle');
-    const msgEl = document.getElementById('genericConfirmMessage');
-    const btnAccept = document.getElementById('btnAcceptGenericConfirm');
-    const btnCancel = document.getElementById('btnCancelGenericConfirm');
-    const btnClose = document.getElementById('btnCloseGenericConfirm');
-
-    if (titleEl) titleEl.textContent = title;
-    if (msgEl) msgEl.innerHTML = message;
-    if (btnAccept) {
-        btnAccept.textContent = confirmText;
-        btnAccept.className = isDanger ? 'btn btn-danger' : 'btn btn-primary';
+    if (el.appConfirmTitle) el.appConfirmTitle.textContent = title;
+    if (el.appConfirmMessage) el.appConfirmMessage.innerHTML = message.replace(/\n/g, '<br>');
+    if (el.btnOkAppConfirm) {
+        el.btnOkAppConfirm.className = `btn ${okButtonClass}`;
+        el.btnOkAppConfirm.textContent = okButtonText;
     }
+    activeConfirmCallback = onConfirm;
+    el.appConfirmModal.classList.add('show');
+    el.appConfirmModal.style.display = 'flex';
+}
 
-    modal.classList.add('show');
-
-    const cleanup = () => {
-        modal.classList.remove('show');
-        if (btnAccept) btnAccept.onclick = null;
-        if (btnCancel) btnCancel.onclick = null;
-        if (btnClose) btnClose.onclick = null;
-    };
-
-    if (btnClose) btnClose.onclick = cleanup;
-    if (btnCancel) btnCancel.onclick = cleanup;
-    if (btnAccept) {
-        btnAccept.onclick = () => {
-            cleanup();
-            if (typeof onConfirm === 'function') onConfirm();
-        };
+function closeInAppConfirm() {
+    if (el.appConfirmModal) {
+        el.appConfirmModal.classList.remove('show');
+        el.appConfirmModal.style.display = 'none';
     }
+    activeConfirmCallback = null;
 }
 
 function renderTimeCellContent(tdTime, session, period) {
@@ -1548,7 +1544,7 @@ function copyFreeTeachersToClipboard() {
             el.btnCopyFreeList.textContent = prevText;
         }, 2000);
     }).catch(err => {
-        showToast('Không thể sao chép vào bộ nhớ tạm: ' + err, 'error');
+        showToast('Không thể sao chép: ' + err, 'error');
     });
 }
 
@@ -1848,10 +1844,8 @@ async function saveAllBellSchedule() {
 
 async function resetBellScheduleToDefault() {
     showInAppConfirm(
-        'Khôi phục Khung giờ Mặc định',
-        'Thầy cô có chắc chắn muốn khôi phục về khung giờ chuẩn mặc định của trường?<br><small style="color: #64748b;">(Sáng: 7:00 - 11:20 | Chiều: 13:15 - 17:35)</small>',
-        'Khôi phục mặc định',
-        true,
+        'Khôi phục Giờ chuẩn',
+        'Thầy cô có chắc chắn muốn khôi phục về khung giờ chuẩn mặc định của trường?\n(Sáng: 7:00 - 11:20 | Chiều: 13:15 - 17:35)',
         async () => {
             try {
                 const res = await fetch('/api/bell-schedule/reset', { method: 'POST' });
@@ -1865,7 +1859,9 @@ async function resetBellScheduleToDefault() {
             } catch (e) {
                 showToast('Lỗi khôi phục: ' + e.message, 'error');
             }
-        }
+        },
+        'btn-primary',
+        'Khôi phục'
     );
 }
 
@@ -2928,11 +2924,21 @@ function setupEventListeners() {
     });
     el.btnConfirmExit.addEventListener('click', executeShutdown);
 
+    // In-app Confirm Modal
+    if (el.btnCloseAppConfirm) el.btnCloseAppConfirm.addEventListener('click', closeInAppConfirm);
+    if (el.btnCancelAppConfirm) el.btnCancelAppConfirm.addEventListener('click', closeInAppConfirm);
+    if (el.btnOkAppConfirm) el.btnOkAppConfirm.addEventListener('click', () => {
+        const cb = activeConfirmCallback;
+        closeInAppConfirm();
+        if (typeof cb === 'function') cb();
+    });
+
     // Close on backdrop or outside click
     window.addEventListener('click', (e) => {
         if (el.settingsDropdownWrapper && !el.settingsDropdownWrapper.contains(e.target)) {
             el.settingsDropdownMenu.style.display = 'none';
         }
+        if (e.target === el.appConfirmModal) closeInAppConfirm();
         if (e.target === el.cellDetailModal) el.cellDetailModal.classList.remove('show');
         if (e.target === el.teacherScheduleModal) el.teacherScheduleModal.classList.remove('show');
         if (e.target === el.classScheduleModal) el.classScheduleModal.classList.remove('show');
