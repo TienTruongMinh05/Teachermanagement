@@ -290,7 +290,23 @@ function setStoredAuthToken(token) {
     }
 }
 
+function setupAuthListeners() {
+    if (el.btnDemoLogin) {
+        el.btnDemoLogin.onclick = handleDemoLogin;
+    }
+    if (el.btnLogout) {
+        el.btnLogout.onclick = handleLogout;
+    }
+    if (el.btnMenuLogout) {
+        el.btnMenuLogout.onclick = () => {
+            if (el.settingsDropdownMenu) el.settingsDropdownMenu.style.display = 'none';
+            handleLogout();
+        };
+    }
+}
+
 async function checkAuthAndInit() {
+    setupAuthListeners();
     try {
         const res = await fetch('/api/auth/config');
         if (!res.ok) throw new Error('Không lấy được cấu hình đăng nhập');
@@ -439,6 +455,10 @@ async function handleGoogleCredentialResponse(response) {
 }
 
 async function handleDemoLogin() {
+    if (el.btnDemoLogin) {
+        el.btnDemoLogin.disabled = true;
+        el.btnDemoLogin.textContent = 'Đang đăng nhập...';
+    }
     try {
         const res = await fetch('/api/auth/demo-login', {
             method: 'POST',
@@ -461,8 +481,15 @@ async function handleDemoLogin() {
         }
     } catch (e) {
         showLoginGate('Lỗi kết nối demo login: ' + e.message);
+    } finally {
+        if (el.btnDemoLogin) {
+            el.btnDemoLogin.disabled = false;
+            el.btnDemoLogin.textContent = 'Đăng nhập thử nghiệm (Demo BGH)';
+        }
     }
 }
+window.handleDemoLogin = handleDemoLogin;
+window.handleLogout = handleLogout;
 
 function applyAuthenticatedUser(user, token) {
     state.currentUser = user;
