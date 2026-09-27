@@ -514,11 +514,17 @@ function applyAuthenticatedUser(user, token) {
 }
 
 function handleLogout() {
-    if (confirm('Thầy có chắc chắn muốn đăng xuất khỏi hệ thống?')) {
-        setStoredAuthToken('');
-        state.currentUser = null;
-        window.location.reload();
-    }
+    showInAppConfirm(
+        'Xác nhận Đăng xuất',
+        'Thầy cô có chắc chắn muốn đăng xuất khỏi hệ thống giám sát thời khóa biểu?',
+        'Đăng xuất',
+        true,
+        () => {
+            setStoredAuthToken('');
+            state.currentUser = null;
+            window.location.reload();
+        }
+    );
 }
 
 // =========================================================
@@ -926,6 +932,44 @@ function showToast(message, type = 'success') {
         toast.style.transform = 'translateX(50px)';
         setTimeout(() => toast.remove(), 300);
     }, 3000);
+}
+
+function showInAppConfirm(title, message, confirmText = 'Xác nhận', isDanger = false, onConfirm = () => {}) {
+    const modal = document.getElementById('genericConfirmModal');
+    if (!modal) {
+        if (confirm(message.replace(/<[^>]*>?/gm, ''))) onConfirm();
+        return;
+    }
+    const titleEl = document.getElementById('genericConfirmTitle');
+    const msgEl = document.getElementById('genericConfirmMessage');
+    const btnAccept = document.getElementById('btnAcceptGenericConfirm');
+    const btnCancel = document.getElementById('btnCancelGenericConfirm');
+    const btnClose = document.getElementById('btnCloseGenericConfirm');
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.innerHTML = message;
+    if (btnAccept) {
+        btnAccept.textContent = confirmText;
+        btnAccept.className = isDanger ? 'btn btn-danger' : 'btn btn-primary';
+    }
+
+    modal.classList.add('show');
+
+    const cleanup = () => {
+        modal.classList.remove('show');
+        if (btnAccept) btnAccept.onclick = null;
+        if (btnCancel) btnCancel.onclick = null;
+        if (btnClose) btnClose.onclick = null;
+    };
+
+    if (btnClose) btnClose.onclick = cleanup;
+    if (btnCancel) btnCancel.onclick = cleanup;
+    if (btnAccept) {
+        btnAccept.onclick = () => {
+            cleanup();
+            if (typeof onConfirm === 'function') onConfirm();
+        };
+    }
 }
 
 function renderTimeCellContent(tdTime, session, period) {
@@ -1425,7 +1469,7 @@ async function openTeacherScheduleModal(teacherId) {
 function handleFileSelected(file) {
     if (!file) return;
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-        alert('Vui lòng chỉ chọn file Excel (.xlsx hoặc .xls)');
+        showToast('Vui lòng chỉ chọn file Excel (.xlsx hoặc .xls)', 'warning');
         return;
     }
     selectedUploadFile = file;
@@ -1504,7 +1548,7 @@ function copyFreeTeachersToClipboard() {
             el.btnCopyFreeList.textContent = prevText;
         }, 2000);
     }).catch(err => {
-        alert('Không thể sao chép: ' + err);
+        showToast('Không thể sao chép vào bộ nhớ tạm: ' + err, 'error');
     });
 }
 
@@ -1803,21 +1847,26 @@ async function saveAllBellSchedule() {
 }
 
 async function resetBellScheduleToDefault() {
-    if (!confirm('Thầy có chắc chắn muốn khôi phục về khung giờ chuẩn mặc định của trường?\n(Sáng: 7:00 - 11:20 | Chiều: 13:15 - 17:35)')) {
-        return;
-    }
-    try {
-        const res = await fetch('/api/bell-schedule/reset', { method: 'POST' });
-        if (!res.ok) throw new Error('Lỗi máy chủ');
-        
-        showToast('Đã khôi phục khung giờ chuẩn mặc định thành công!');
-        await fetchBellSchedule();
-        await pollRealtimeStatus();
-        renderMatrixTable(state.matrix);
-        renderBellManageTable();
-    } catch (e) {
-        showToast('Lỗi khôi phục: ' + e.message, 'error');
-    }
+    showInAppConfirm(
+        'Khôi phục Khung giờ Mặc định',
+        'Thầy cô có chắc chắn muốn khôi phục về khung giờ chuẩn mặc định của trường?<br><small style="color: #64748b;">(Sáng: 7:00 - 11:20 | Chiều: 13:15 - 17:35)</small>',
+        'Khôi phục mặc định',
+        true,
+        async () => {
+            try {
+                const res = await fetch('/api/bell-schedule/reset', { method: 'POST' });
+                if (!res.ok) throw new Error('Lỗi máy chủ');
+                
+                showToast('Đã khôi phục khung giờ chuẩn mặc định thành công!');
+                await fetchBellSchedule();
+                await pollRealtimeStatus();
+                renderMatrixTable(state.matrix);
+                renderBellManageTable();
+            } catch (e) {
+                showToast('Lỗi khôi phục: ' + e.message, 'error');
+            }
+        }
+    );
 }
 
 // Exit & Shutdown App
