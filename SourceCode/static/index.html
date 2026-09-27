@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRƯỜNG THPT NGUYỄN HUỆ - GIÁM SÁT THỜI KHÓA BIỂU</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Google Identity Services for Google Login -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+    <!-- LOGIN GATE OVERLAY (Bảo vệ truy cập nội bộ khi chạy Web) -->
+    <div class="login-gate-overlay" id="loginGateOverlay" style="display: none;">
+        <div class="login-gate-card">
+            <div class="login-gate-header">
+                <div class="login-school-badge">THPT NGUYỄN HUỆ</div>
+                <h2 class="login-gate-title">HỆ THỐNG GIÁM SÁT THỜI KHÓA BIỂU</h2>
+                <p class="login-gate-subtitle">Cổng tra cứu thời khóa biểu & điều hành giảng dạy theo thời gian thực</p>
+            </div>
+
+            <div class="login-gate-body">
+                <div class="login-notice-box">
+                    <div class="login-notice-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <strong style="display: block; margin-bottom: 2px;">Cổng thông tin nội bộ nhà trường:</strong>
+                        <span>Hệ thống chỉ dành cho Ban Giám hiệu và Cán bộ Giáo viên. Vui lòng đăng nhập bằng tài khoản Google do ngành cấp (<strong>@ninhthuan.edu.vn</strong>) để tiếp tục.</span>
+                    </div>
+                </div>
+
+                <!-- Google Sign In Button Container -->
+                <div class="google-signin-wrapper">
+                    <div id="googleSignInBtnContainer"></div>
+                </div>
+
+                <!-- Demo Login Option (if Google Client ID not yet set or in test mode) -->
+                <div class="demo-login-wrapper" id="demoLoginWrapper" style="display: none;">
+                    <div class="login-divider"><span>HOẶC</span></div>
+                    <button class="btn btn-secondary btn-block" id="btnDemoLogin" type="button">
+                        Đăng nhập thử nghiệm (Demo BGH)
+                    </button>
+                    <p class="demo-login-hint">Dành cho việc kiểm tra giao diện khi chưa cấu hình Google Client ID trên Cloud.</p>
+                </div>
+
+                <!-- Login Alert Message -->
+                <div class="login-error-alert" id="loginErrorAlert" style="display: none;"></div>
+            </div>
+
+            <div class="login-gate-footer">
+                <div>&copy; Trương Minh Tiến - Eastern International University</div>
+                <small>Bản quyền phần mềm giám sát thời khóa biểu chuyên biệt</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOP HEADER -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="header-branding">
+                <div class="brand-titles">
+                    <div class="school-name" id="schoolName">TRƯỜNG THPT NGUYỄN HUỆ</div>
+                    <h1 class="system-title">GIÁM SÁT THỜI KHÓA BIỂU</h1>
+                </div>
+            </div>
+
+            <!-- Real-time Live Badge -->
+            <div class="header-live-panel">
+                <div class="live-clock">
+                    <span class="live-indicator"></span>
+                    <span class="clock-time" id="liveClock">--:--:--</span>
+                </div>
+                <div class="live-date-period">
+                    <span class="live-date" id="liveDate">Đang tải ngày...</span>
+                    <span class="live-period-badge" id="livePeriodBadge">Đang kết nối...</span>
+                </div>
+            </div>
+
+            <!-- Top Actions: 2 Navigation Tabs, User Profile & Cài Đặt Dropdown -->
+            <div class="header-actions">
+                <div class="header-nav-tabs">
+                    <button class="nav-tab-btn active" id="btnNavTeacher" title="Chuyển sang Giám sát theo Giáo viên">
+                        Giáo Viên
+                    </button>
+                    <button class="nav-tab-btn" id="btnNavClass" title="Chuyển sang Giám sát theo Lớp học">
+                        Lớp học
+                    </button>
+                </div>
+
+                <!-- User Profile Badge (Google Login) -->
+                <div class="user-profile-badge" id="userProfileBadge" style="display: none;">
+                    <img id="userAvatarImg" class="user-avatar" src="" alt="avatar" style="display: none;" />
+                    <div id="userAvatarInitial" class="user-initial">GV</div>
+                    <div class="user-info-text">
+                        <span id="userDisplayName" class="user-name">Giáo viên</span>
+                        <span id="userDisplayEmail" class="user-email">email@domain.com</span>
+                    </div>
+                    <button class="btn-logout-small" id="btnLogout" type="button" title="Đăng xuất khỏi hệ thống">
+                        Đăng xuất
+                    </button>
+                </div>
+
+                <div class="settings-dropdown-wrapper" id="settingsDropdownWrapper">
+                    <button class="btn btn-settings-menu" id="btnSettingsToggle" type="button" title="Mở danh mục Cài đặt và Tiện ích">
+                        Cài đặt
+                    </button>
+                    <div class="settings-dropdown-menu" id="settingsDropdownMenu" style="display: none;">
+                        <button class="settings-menu-item" id="btnOpenUploadModal">
+                            Nạp file TKB (Excel)
+                        </button>
+                        <button class="settings-menu-item" id="btnOpenBellModal">
+                            Khung giờ học
+                        </button>
+                        <button class="settings-menu-item" id="btnOpenGuideModal">
+                            Hướng dẫn sử dụng
+                        </button>
+                        <div class="settings-menu-divider"></div>
+                        <button class="settings-menu-item item-danger" id="btnMenuLogout" style="display: none;">
+                            Đăng xuất tài khoản
+                        </button>
+                        <button class="settings-menu-item item-danger" id="btnTriggerExit">
+                            Thoát chương trình
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SUB HEADER -->
+        <div class="sub-header-bar">
+            <div class="meta-tag">
+                <span class="meta-label">Năm học:</span>
+                <span class="meta-value" id="metaYear">2026 - 2027</span>
+            </div>
+            <div class="meta-tag">
+                <span class="meta-label">Học kỳ:</span>
+                <span class="meta-value" id="metaSemester">Học kỳ 1</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="main-content">
+
+        <!-- TIME CONTROLLER & VIEW SWITCHER (Dùng chung cho cả Giáo viên và Lớp học) -->
+        <section class="control-panel card">
+            <div class="panel-left">
+                <!-- Mode Toggle -->
+                <div class="time-mode-selector">
+                    <label class="radio-label">
+                        <input type="radio" name="timeMode" value="realtime" id="modeRealtime" checked>
+                        <span class="radio-custom"></span>
+                        <span class="mode-text"><strong>Trực tiếp (Thời gian thực)</strong></span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="timeMode" value="custom" id="modeCustom">
+                        <span class="radio-custom"></span>
+                        <span class="mode-text"><strong>Chọn thời điểm tra cứu</strong></span>
+                    </label>
+                </div>
+
+                <!-- Custom Pickers -->
+                <div class="custom-time-pickers" id="customTimePickers" style="display: none;">
+                    <div class="picker-group">
+                        <label for="selectDay">Thứ:</label>
+                        <select id="selectDay" class="form-select">
+                            <option value="2">Thứ 2</option>
+                            <option value="3">Thứ 3</option>
+                            <option value="4">Thứ 4</option>
+                            <option value="5">Thứ 5</option>
+                            <option value="6">Thứ 6</option>
+                            <option value="7">Thứ 7</option>
+                        </select>
+                    </div>
+
+                    <div class="picker-group">
+                        <label for="selectSession">Buổi:</label>
+                        <select id="selectSession" class="form-select">
+                            <option value="sang">Buổi Sáng</option>
+                            <option value="chieu">Buổi Chiều</option>
+                        </select>
+                    </div>
+
+                    <div class="picker-group">
+                        <label for="selectPeriod">Tiết:</label>
+                        <select id="selectPeriod" class="form-select">
+                            <option value="1">Tiết 1</option>
+                            <option value="2">Tiết 2</option>
+                            <option value="3">Tiết 3</option>
+                            <option value="4">Tiết 4</option>
+                            <option value="5">Tiết 5</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary btn-sm" id="btnApplyCustomTime">Tra cứu</button>
+                </div>
+            </div>
+
+            <div class="panel-right">
+                <!-- View Mode Switcher: Dạng Thẻ, Dạng Lưới, Dạng Bảng -->
+                <div class="view-switch-group">
+                    <span class="view-label">Chế độ xem:</span>
+                    <button class="btn-toggle active" id="btnViewCard" title="Xem danh sách thẻ chi tiết">
+                        Dạng Thẻ
+                    </button>
+                    <button class="btn-toggle" id="btnViewGrid" title="Xem dạng lưới nhỏ gọn">
+                        Dạng Lưới
+                    </button>
+                    <button class="btn-toggle" id="btnViewTable" title="Xem bảng thời khóa biểu tuần">
+                        Dạng Bảng
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================= -->
+        <!-- TAB 1: QUẢN LÝ THEO GIÁO VIÊN                             -->
+        <!-- ========================================================= -->
+        <div id="sectionTeacherManagement">
+            <!-- KPI STATS SUMMARY BAR FOR TEACHERS -->
+            <section class="kpi-stats-grid">
+                <div class="kpi-card kpi-total active" id="filterCardTotal" title="Bấm vào để xem tất cả giáo viên">
+                    <div class="kpi-info">
+                        <span class="kpi-num" id="statTotal">111</span>
+                        <span class="kpi-title">Tổng số giáo viên</span>
+                    </div>
+                </div>
+
+                <div class="kpi-card kpi-teaching" id="filterCardTeaching" title="Bấm vào để lọc giáo viên đang đứng lớp">
+                    <div class="kpi-info">
+                        <span class="kpi-num" id="statTeaching">0</span>
+                        <span class="kpi-title">Đang đứng lớp</span>
+                    </div>
+                    <span class="kpi-badge">Viền xanh</span>
+                </div>
+
+                <div class="kpi-card kpi-free" id="filterCardFree" title="Bấm vào để lọc giáo viên đang rảnh">
+                    <div class="kpi-info">
+                        <span class="kpi-num" id="statFree">0</span>
+                        <span class="kpi-title">Đang rảnh / Trống tiết</span>
+                    </div>
+                    <span class="kpi-badge">Viền đỏ</span>
+                </div>
+
+                <div class="kpi-card kpi-special" id="filterCardSpecial" title="Bấm vào để lọc giáo viên giao ban, chào cờ">
+                    <div class="kpi-info">
+                        <span class="kpi-num" id="statSpecial">0</span>
+                        <span class="kpi-title">Chào cờ / Giao ban</span>
+                    </div>
+                    <span class="kpi-badge">Viền vàng, cam</span>
+                </div>
+            </section>
+
+            <!-- FILTERS TOOLBAR FOR TEACHERS -->
+            <section class="filter-toolbar card" id="filterToolbar">
+                <div class="filter-item search-box">
+                    <input type="text" id="searchInput" placeholder="Tìm theo tên giáo viên, mã viết tắt, SĐT..." autocomplete="off">
+                    <button class="btn-clear" id="btnClearSearch" title="Xóa tìm kiếm">&times;</button>
+                </div>
+
+                <div class="filter-item">
+                    <label for="filterSubject">Tổ chuyên môn:</label>
+                    <select id="filterSubject" class="form-select">
+                        <option value="all">Tất cả các tổ môn</option>
+                    </select>
+                </div>
+
+                <div class="filter-item">
+                    <label for="filterClass">Lớp học:</label>
+                    <select id="filterClass" class="form-select">
+                        <option value="all">Tất cả các lớp</option>
+                    </select>
+                </div>
+
+                <div class="filter-item">
+                    <label for="filterStatus">Trạng thái:</label>
+                    <select id="filterStatus" class="form-select">
+                        <option value="all">Tất cả trạng thái</option>
+                        <option value="teaching">Đang đứng lớp (Viền xanh)</option>
+                        <option value="free">Đang rảnh (Viền đỏ)</option>
+                        <option value="special">Giao ban / Chào cờ</option>
+                        <option value="homeroom">Có làm chủ nhiệm</option>
+                    </select>
+                </div>
+
+                <div class="filter-item current-time-display">
+                    <span class="badge-time" id="targetTimeLabel">Đang xem: Thứ 2 | Tiết 1 Sáng</span>
+                </div>
+            </section>
+
+            <!-- LEGEND BAR FOR TEACHERS -->
+            <section class="legend-bar" id="legendBar">
+                <span class="legend-title">Quy ước trạng thái giáo viên:</span>
+                <span class="legend-item"><span class="legend-dot dot-green"></span> Viền xanh: Đang đứng lớp</span>
+                <span class="legend-item"><span class="legend-dot dot-red"></span> Viền đỏ: Đang rảnh (Trống tiết)</span>
+                <span class="legend-item"><span class="legend-dot dot-yellow"></span> Viền vàng: Chào cờ</span>
+                <span class="legend-item"><span class="legend-dot dot-orange"></span> Viền cam: Giao ban / Hội ý</span>
+            </section>
+
+            <!-- VIEW 1: DẠNG THẺ GIÁO VIÊN -->
+            <section class="view-content" id="sectionCardView">
+                <div class="teachers-card-grid" id="teachersCardGrid">
+                    <!-- Populated via JS -->
+                </div>
+                <div class="empty-state" id="emptyStateCards" style="display: none;">
+                    <h3>Không tìm thấy giáo viên nào</h3>
+                    <p>Vui lòng thử lại với từ khóa hoặc bộ lọc khác.</p>
+                    <button class="btn btn-secondary btn-sm" id="btnResetFiltersCards">Xóa bộ lọc</button>
+                </div>
+            </section>
+
+            <!-- VIEW 2: DẠNG LƯỚI GIÁO VIÊN -->
+            <section class="view-content" id="sectionGridView" style="display: none;">
+                <div class="teachers-compact-grid" id="teachersCompactGrid">
+                    <!-- Populated via JS -->
+                </div>
+                <div class="empty-state" id="emptyStateGrid" style="display: none;">
+                    <h3>Không tìm thấy giáo viên nào</h3>
+                    <p>Vui lòng thử lại với từ khóa hoặc bộ lọc khác.</p>
+                    <button class="btn btn-secondary btn-sm" id="btnResetFiltersGrid">Xóa bộ lọc</button>
+                </div>
+            </section>
+
+            <!-- VIEW 3: DẠNG BẢNG GIÁO VIÊN -->
+            <section class="view-content" id="sectionTableView" style="display: none;">
+                <div class="table-header-bar card">
+                    <div>
+                        <h3 class="section-title">BẢNG THỜI KHÓA BIỂU TOÀN TRƯỜNG THEO GIÁO VIÊN</h3>
+                        <p class="section-subtitle">Bấm vào bất kỳ ô tiết học nào để xem danh sách giáo viên đứng lớp/rảnh. Bấm vào cột Tiết hoặc Khung giờ để chỉnh sửa giờ học.</p>
+                    </div>
+                    <div class="table-actions">
+                        <button class="btn btn-secondary btn-sm" id="btnEditBellSchedule" title="Chỉnh sửa khung giờ vào học / tan học">
+                            Chỉnh sửa khung giờ
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="btnRefreshTable" title="Tải lại bảng thời khóa biểu">
+                            Làm mới
+                        </button>
+                    </div>
+                </div>
+
+                <div class="matrix-table-wrapper card">
+                    <table class="matrix-table" id="matrixTable">
+                        <thead>
+                            <tr>
+                                <th class="col-session">Buổi</th>
+                                <th class="col-period">Tiết</th>
+                                <th class="col-time">Khung giờ</th>
+                                <th class="col-day">Thứ Hai</th>
+                                <th class="col-day">Thứ Ba</th>
+                                <th class="col-day">Thứ Tư</th>
+                                <th class="col-day">Thứ Năm</th>
+                                <th class="col-day">Thứ Sáu</th>
+                                <th class="col-day">Thứ Bảy</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matrixTableBody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB 2: QUẢN LÝ THEO LỚP HỌC                               -->
+        <!-- ========================================================= -->
+        <div id="sectionClassManagement" style="display: none;">
+            <!-- KPI STATS SUMMARY BAR FOR CLASSES -->
+            <section class="kpi-stats-grid">
+                <div class="kpi-card kpi-total active" id="filterCardClassTotal" title="Bấm vào để xem tất cả các lớp">
+                    <div class="kpi-info">
+                        <span class="kpi-num" id="statClassTotal">56</span>
+                        <span class="kpi-title">Tổng số lớp học</span>
+                    </div>
+                </div>
+
+                <div class="kpi-card kpi-teaching" id="filterCardClassLearning" title="Bấm vào để lọc lớp đang có tiết học">
+                    <div class="kpi-info">
+                        <span class="kpi-num" id="statClassLearning">0</span>
+                        <span class="kpi-title">Lớp đang học</span>
+                    </div>
+                    <span class="kpi-badge">Viền xanh</span>
+                </div>
+
+                <div class="kpi-card kpi-free" id="filterCardClassFree" title="Bấm vào để lọc lớp đang trống tiết hoặc nghỉ">
+                    <div class="kpi-info">
+                        <span class="kpi-num" id="statClassFree">0</span>
+                        <span class="kpi-title">Trống tiết / Đang nghỉ</span>
+                    </div>
+                    <span class="kpi-badge">Viền đỏ</span>
+                </div>
+
+                <div class="kpi-card kpi-special" id="filterCardClassSpecial" title="Bấm vào để lọc lớp chào cờ, sinh hoạt">
+                    <div class="kpi-info">
+                        <span class="kpi-num" id="statClassSpecial">0</span>
+                        <span class="kpi-title">Chào cờ / Sinh hoạt</span>
+                    </div>
+                    <span class="kpi-badge">Viền vàng, cam</span>
+                </div>
+            </section>
+
+            <!-- FILTERS TOOLBAR FOR CLASSES -->
+            <section class="filter-toolbar card" id="filterToolbarClass">
+                <div class="filter-item search-box">
+                    <input type="text" id="searchClassInput" placeholder="Tìm theo tên lớp, môn học, giáo viên dạy, GVCN..." autocomplete="off">
+                    <button class="btn-clear" id="btnClearSearchClass" title="Xóa tìm kiếm">&times;</button>
+                </div>
+
+                <div class="filter-item">
+                    <label for="filterClassGrade">Khối học:</label>
+                    <select id="filterClassGrade" class="form-select">
+                        <option value="all">Tất cả các khối</option>
+                        <option value="10">Khối 10</option>
+                        <option value="11">Khối 11</option>
+                        <option value="12">Khối 12</option>
+                    </select>
+                </div>
+
+                <div class="filter-item">
+                    <label for="filterClassSubject">Môn học đang học:</label>
+                    <select id="filterClassSubject" class="form-select">
+                        <option value="all">Tất cả các môn</option>
+                    </select>
+                </div>
+
+                <div class="filter-item">
+                    <label for="filterClassHomeroom">Giáo viên chủ nhiệm:</label>
+                    <select id="filterClassHomeroom" class="form-select">
+                        <option value="all">Tất cả GVCN</option>
+                    </select>
+                </div>
+
+                <div class="filter-item">
+                    <label for="filterClassStatus">Trạng thái:</label>
+                    <select id="filterClassStatus" class="form-select">
+                        <option value="all">Tất cả trạng thái</option>
+                        <option value="learning">Đang học (Viền xanh)</option>
+                        <option value="free">Trống tiết / Nghỉ (Viền đỏ)</option>
+                        <option value="special">Chào cờ / Sinh hoạt</option>
+                    </select>
+                </div>
+
+                <div class="filter-item current-time-display">
+                    <span class="badge-time" id="targetTimeLabelClass">Đang xem: Thứ 2 | Tiết 1 Sáng</span>
+                </div>
+            </section>
+
+            <!-- LEGEND BAR FOR CLASSES -->
+            <section class="legend-bar" id="legendBarClass">
+                <span class="legend-title">Quy ước trạng thái lớp học:</span>
+                <span class="legend-item"><span class="legend-dot dot-green"></span> Viền xanh: Lớp đang học</span>
+                <span class="legend-item"><span class="legend-dot dot-red"></span> Viền đỏ: Trống tiết (Đang nghỉ)</span>
+                <span class="legend-item"><span class="legend-dot dot-yellow"></span> Viền vàng: Chào cờ</span>
+                <span class="legend-item"><span class="legend-dot dot-orange"></span> Viền cam: Sinh hoạt / Chuyên đề</span>
+            </section>
+
+            <!-- VIEW 1: DẠNG THẺ LỚP HỌC -->
+            <section class="view-content" id="sectionClassCardView">
+                <div class="classes-card-grid" id="classesCardGrid">
+                    <!-- Populated via JS -->
+                </div>
+                <div class="empty-state" id="emptyStateClassCards" style="display: none;">
+                    <h3>Không tìm thấy lớp học nào</h3>
+                    <p>Vui lòng thử lại với từ khóa hoặc bộ lọc khác.</p>
+                    <button class="btn btn-secondary btn-sm" id="btnResetFiltersClassCards">Xóa bộ lọc</button>
+                </div>
+            </section>
+
+            <!-- VIEW 2: DẠNG LƯỚI LỚP HỌC -->
+            <section class="view-content" id="sectionClassGridView" style="display: none;">
+                <div class="classes-compact-grid" id="classesCompactGrid">
+                    <!-- Populated via JS -->
+                </div>
+                <div class="empty-state" id="emptyStateClassGrid" style="display: none;">
+                    <h3>Không tìm thấy lớp học nào</h3>
+                    <p>Vui lòng thử lại với từ khóa hoặc bộ lọc khác.</p>
+                    <button class="btn btn-secondary btn-sm" id="btnResetFiltersClassGrid">Xóa bộ lọc</button>
+                </div>
+            </section>
+
+            <!-- VIEW 3: DẠNG BẢNG LỚP HỌC -->
+            <section class="view-content" id="sectionClassTableView" style="display: none;">
+                <div class="table-header-bar card">
+                    <div>
+                        <h3 class="section-title">BẢNG THỜI KHÓA BIỂU TOÀN TRƯỜNG THEO LỚP HỌC</h3>
+                        <p class="section-subtitle">Bấm vào bất kỳ ô tiết học nào để xem danh sách chi tiết các lớp học/lớp trống. Bấm vào cột Tiết hoặc Khung giờ để chỉnh sửa giờ học.</p>
+                    </div>
+                    <div class="table-actions">
+                        <div class="picker-group-inline">
+                            <label for="selectClassForSchedule" style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Xem TKB 1 lớp:</label>
+                            <select id="selectClassForSchedule" class="form-select form-select-sm" style="min-width: 140px;">
+                                <option value="">-- Chọn lớp xem TKB --</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="btnEditBellScheduleClass" title="Chỉnh sửa khung giờ vào học / tan học">
+                            Chỉnh sửa khung giờ
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="btnRefreshClassTable" title="Tải lại bảng thời khóa biểu lớp">
+                            Làm mới
+                        </button>
+                    </div>
+                </div>
+
+                <div class="matrix-table-wrapper card">
+                    <table class="matrix-table" id="classMatrixTable">
+                        <thead>
+                            <tr>
+                                <th class="col-session">Buổi</th>
+                                <th class="col-period">Tiết</th>
+                                <th class="col-time">Khung giờ</th>
+                                <th class="col-day">Thứ Hai</th>
+                                <th class="col-day">Thứ Ba</th>
+                                <th class="col-day">Thứ Tư</th>
+                                <th class="col-day">Thứ Năm</th>
+                                <th class="col-day">Thứ Sáu</th>
+                                <th class="col-day">Thứ Bảy</th>
+                            </tr>
+                        </thead>
+                        <tbody id="classMatrixTableBody">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- FOOTER COPYRIGHT -->
+    <footer class="app-footer">
+        <div class="footer-title">&copy; Trương Minh Tiến - Eastern International University</div>
+        <div class="footer-sub">Hệ thống giám sát thời khóa biểu</div>
+    </footer>
+
+    <!-- MODAL 1: CHI TIẾT Ô TIẾT HỌC -->
+    <div class="modal-overlay" id="cellDetailModal">
+        <div class="modal-box modal-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="cellDetailTitle">Chi tiết Tiết học</h3>
+                    <p class="modal-subtitle" id="cellDetailSubtitle">Danh sách phân bổ giáo viên</p>
+                </div>
+                <button class="btn-close-modal" id="btnCloseCellModal">&times;</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="modal-tab active" id="tabTeaching">
+                    Đang đứng lớp (<span id="countModalTeaching">0</span>)
+                </button>
+                <button class="modal-tab" id="tabFree">
+                    Đang rảnh / Trống tiết (<span id="countModalFree">0</span>)
+                </button>
+                <button class="modal-tab" id="tabSpecialModal">
+                    Giao ban / Chào cờ (<span id="countModalSpecial">0</span>)
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="tab-pane active" id="paneTeaching">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="45">STT</th>
+                                    <th>Họ và Tên Giáo viên</th>
+                                    <th>Số điện thoại</th>
+                                    <th>Mã TKB</th>
+                                    <th>Tổ Bộ Môn</th>
+                                    <th>Môn Giảng Dạy</th>
+                                    <th>Lớp Học</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyTeaching"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="tab-pane" id="paneFree">
+                    <div class="pane-action-bar">
+                        <span class="text-muted">Danh sách giáo viên rảnh để bố trí dạy thay hoặc phân công việc:</span>
+                        <button class="btn btn-secondary btn-sm" id="btnCopyFreeList">
+                            Sao chép danh sách
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="45">STT</th>
+                                    <th>Họ và Tên Giáo viên</th>
+                                    <th>Số điện thoại</th>
+                                    <th>Mã TKB</th>
+                                    <th>Tổ Bộ Môn</th>
+                                    <th>Lớp Chủ Nhiệm</th>
+                                    <th>Định mức (Tiết/tuần)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyFree"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="tab-pane" id="paneSpecial">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="45">STT</th>
+                                    <th>Họ và Tên Giáo viên</th>
+                                    <th>Số điện thoại</th>
+                                    <th>Mã TKB</th>
+                                    <th>Tổ Bộ Môn</th>
+                                    <th>Nội dung Hoạt động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodySpecial"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnDismissCellModal">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: THỜI KHÓA BIỂU TUẦN CỦA GIÁO VIÊN -->
+    <div class="modal-overlay" id="teacherScheduleModal">
+        <div class="modal-box modal-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="teacherModalName">Thời khóa biểu Giáo viên</h3>
+                    <p class="modal-subtitle" id="teacherModalInfo">Tổ chuyên môn & Chủ nhiệm</p>
+                </div>
+                <button class="btn-close-modal" id="btnCloseTeacherModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="teacher-overview-card">
+                    <div class="t-info-item"><strong>Mã TKB:</strong> <span id="tModalShort"></span></div>
+                    <div class="t-info-item"><strong>Số điện thoại:</strong> <span id="tModalPhone"></span></div>
+                    <div class="t-info-item"><strong>Tổ bộ môn:</strong> <span id="tModalSubject"></span></div>
+                    <div class="t-info-item"><strong>Lớp chủ nhiệm:</strong> <span id="tModalCN"></span></div>
+                    <div class="t-info-item"><strong>Tổng số tiết/tuần:</strong> <span id="tModalPeriods"></span></div>
+                    <div class="t-info-item"><strong>Phân công:</strong> <span id="tModalDetails"></span></div>
+                </div>
+
+                <div class="table-responsive mt-3">
+                    <table class="schedule-matrix-table">
+                        <thead>
+                            <tr>
+                                <th>Buổi</th>
+                                <th>Tiết</th>
+                                <th>Thứ 2</th>
+                                <th>Thứ 3</th>
+                                <th>Thứ 4</th>
+                                <th>Thứ 5</th>
+                                <th>Thứ 6</th>
+                                <th>Thứ 7</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyTeacherSchedule"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnDismissTeacherModal">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: THỜI KHÓA BIỂU TUẦN CỦA LỚP HỌC -->
+    <div class="modal-overlay" id="classScheduleModal">
+        <div class="modal-box modal-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="classModalTitle">Thời khóa biểu Lớp học</h3>
+                    <p class="modal-subtitle" id="classModalInfo">Thông tin lớp học & GVCN</p>
+                </div>
+                <button class="btn-close-modal" id="btnCloseClassModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="teacher-overview-card">
+                    <div class="t-info-item"><strong>Lớp:</strong> <span id="cModalName"></span></div>
+                    <div class="t-info-item"><strong>Khối:</strong> <span id="cModalGrade"></span></div>
+                    <div class="t-info-item"><strong>Ca học:</strong> <span id="cModalShift"></span></div>
+                    <div class="t-info-item"><strong>Giáo viên chủ nhiệm:</strong> <span id="cModalGVCN"></span></div>
+                    <div class="t-info-item"><strong>SĐT GVCN:</strong> <span id="cModalGVCNPhone"></span></div>
+                    <div class="t-info-item"><strong>Tổng số tiết học/tuần:</strong> <span id="cModalTotalPeriods"></span></div>
+                </div>
+
+                <h4 style="margin: 16px 0 8px; font-size: 14px; font-weight: 700; color: var(--primary-navy);">
+                    BẢNG THỜI KHÓA BIỂU TUẦN CHI TIẾT (10 TIẾT)
+                </h4>
+                <div class="table-responsive">
+                    <table class="schedule-matrix-table">
+                        <thead>
+                            <tr>
+                                <th>Buổi</th>
+                                <th>Tiết</th>
+                                <th>Thứ Hai</th>
+                                <th>Thứ Ba</th>
+                                <th>Thứ Tư</th>
+                                <th>Thứ Năm</th>
+                                <th>Thứ Sáu</th>
+                                <th>Thứ Bảy</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyClassSchedule"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnDismissClassModal">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CHI TIẾT Ô TIẾT HỌC CỦA CÁC LỚP -->
+    <div class="modal-overlay" id="classCellDetailModal">
+        <div class="modal-box modal-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="classCellDetailTitle">Chi tiết Tiết học - Toàn trường theo Lớp</h3>
+                    <p class="modal-subtitle" id="classCellDetailSubtitle">Danh sách lớp đang học & trống tiết</p>
+                </div>
+                <button class="btn-close-modal" id="btnCloseClassCellModal">&times;</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="modal-tab active" id="tabClassLearning">
+                    Lớp đang học (<span id="countClassModalLearning">0</span>)
+                </button>
+                <button class="modal-tab" id="tabClassFree">
+                    Trống tiết / Nghỉ (<span id="countClassModalFree">0</span>)
+                </button>
+                <button class="modal-tab" id="tabClassSpecialModal">
+                    Chào cờ / Sinh hoạt (<span id="countClassModalSpecial">0</span>)
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="tab-pane active" id="paneClassLearning">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="45">STT</th>
+                                    <th>Lớp Học</th>
+                                    <th>Khối</th>
+                                    <th>Ca</th>
+                                    <th>Môn Giảng Dạy</th>
+                                    <th>Giáo viên Đứng lớp</th>
+                                    <th>SĐT Giáo viên</th>
+                                    <th>Giáo viên Chủ nhiệm</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyClassLearning"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="tab-pane" id="paneClassFree">
+                    <div class="pane-action-bar">
+                        <span class="text-muted">Danh sách các lớp hiện đang trống tiết hoặc không có lịch học ở khung giờ này:</span>
+                        <button class="btn btn-secondary btn-sm" id="btnCopyClassFreeList">
+                            Sao chép danh sách
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="45">STT</th>
+                                    <th>Lớp Học</th>
+                                    <th>Khối</th>
+                                    <th>Ca học chính</th>
+                                    <th>Giáo viên Chủ nhiệm</th>
+                                    <th>SĐT GVCN</th>
+                                    <th>Ghi chú</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyClassFree"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="tab-pane" id="paneClassSpecial">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="45">STT</th>
+                                    <th>Lớp Học</th>
+                                    <th>Khối</th>
+                                    <th>Nội dung Hoạt động</th>
+                                    <th>Giáo viên Chủ nhiệm</th>
+                                    <th>SĐT GVCN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyClassSpecial"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnDismissClassCellModal">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: NẠP FILE EXCEL MỚI -->
+    <div class="modal-overlay" id="uploadModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">Nạp file Thời khóa biểu mới (Excel)</h3>
+                    <p class="modal-subtitle">Tải lên file Excel (.xlsx, .xls) đã cập nhật</p>
+                </div>
+                <button class="btn-close-modal" id="btnCloseUploadModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-guide-alert">
+                    <strong>Định dạng file yêu cầu:</strong> File Excel thời khóa biểu chuẩn gồm các sheet:
+                    <ul>
+                        <li><code>PCGD</code>: Bảng phân công giảng dạy toàn trường.</li>
+                        <li><code>TKB_GV_SC</code>: Thời khóa biểu giáo viên cả ngày.</li>
+                        <li><code>TKB_LOP_SC</code>: Thời khóa biểu các lớp.</li>
+                    </ul>
+                </div>
+
+                <div class="dropzone" id="dropzone">
+                    <h4>Kéo thả file Excel vào đây</h4>
+                    <p class="text-muted">hoặc bấm vào nút bên dưới để chọn file từ máy tính</p>
+                    <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;">
+                    <button class="btn btn-primary btn-sm" id="btnBrowseFile">Chọn file Excel</button>
+                    <div class="selected-file-info" id="selectedFileInfo" style="display: none;"></div>
+                </div>
+
+                <div class="upload-status" id="uploadStatus" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnDismissUploadModal">Hủy</button>
+                <button class="btn btn-primary" id="btnSubmitUpload" disabled>Bắt đầu Nạp file</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CÀI ĐẶT KHUNG GIỜ HỌC -->
+    <div class="modal-overlay" id="bellScheduleModal">
+        <div class="modal-box modal-lg" style="max-width: 780px;">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">CÀI ĐẶT KHUNG GIỜ HỌC</h3>
+                    <p class="modal-subtitle">Cấu trúc chuẩn 10 tiết (5 tiết Sáng & 5 tiết Chiều) - Cho phép sửa thủ công từng tiết</p>
+                </div>
+                <button class="btn-close-modal" id="btnCloseBellModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="bell-modal-notice">
+                    <strong>Hướng dẫn sử dụng:</strong> Thầy có thể gõ trực tiếp giờ bắt đầu và kết thúc (định dạng <code>HH:MM</code>, ví dụ: <code>07:00</code>, <code>07:45</code>) vào từng ô. Bấm nút <strong>Lưu</strong> ở từng dòng để cập nhật riêng tiết đó, hoặc bấm <strong>Lưu tất cả thay đổi</strong> ở góc dưới để cập nhật toàn bộ.
+                </div>
+
+                <div class="table-responsive mt-2">
+                    <table class="bell-manage-table">
+                        <thead>
+                            <tr>
+                                <th width="120">Buổi / Tiết</th>
+                                <th>Giờ bắt đầu</th>
+                                <th width="20" class="text-center">-</th>
+                                <th>Giờ kết thúc</th>
+                                <th width="110" class="text-center">Thời lượng</th>
+                                <th width="90" class="text-center">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyBellManage">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="bell-recess-info" id="bellRecessInfo">
+                    <!-- Dynamic calculated recess & lunch breaks -->
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button class="btn btn-secondary" id="btnResetBellSchedule" style="color: #b91c1c; border-color: #fca5a5;">
+                    Khôi phục giờ chuẩn
+                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" id="btnDismissBellModal">Đóng</button>
+                    <button class="btn btn-primary" id="btnSaveAllBellSchedule">Lưu tất cả thay đổi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: HƯỚNG DẪN SỬ DỤNG -->
+    <div class="modal-overlay" id="guideModal">
+        <div class="modal-box modal-lg" style="max-width: 920px;">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">HƯỚNG DẪN SỬ DỤNG HỆ THỐNG</h3>
+                    <p class="modal-subtitle">Dành cho Thầy Hiệu trưởng và Ban Giám hiệu</p>
+                </div>
+                <button class="btn-close-modal" id="btnCloseGuideModal">&times;</button>
+            </div>
+            <div class="modal-body guide-modal-body">
+                <!-- Mục 1: Ý nghĩa màu sắc -->
+                <div class="guide-section">
+                    <h4 class="guide-sec-title">1. Quy ước Màu sắc Trạng thái Giáo viên</h4>
+                    <p class="guide-desc">Hệ thống phân biệt trạng thái giáo viên ngay tại thời điểm hiện tại thông qua viền màu sắc nét:</p>
+                    <div class="guide-color-grid">
+                        <div class="guide-color-item item-green">
+                            <strong>Viền Xanh lá</strong>
+                            <span>Giáo viên <strong>đang đứng lớp</strong> giảng dạy. Hiển thị rõ môn học và lớp đang dạy (ví dụ: Toán - 12A1).</span>
+                        </div>
+                        <div class="guide-color-item item-red">
+                            <strong>Viền Đỏ</strong>
+                            <span>Giáo viên <strong>không có tiết / đang rảnh</strong>. Dùng để nhanh chóng tìm giáo viên bố trí dạy thay hoặc họp đột xuất.</span>
+                        </div>
+                        <div class="guide-color-item item-yellow">
+                            <strong>Viền Vàng</strong>
+                            <span>Tiết <strong>Chào cờ</strong> toàn trường (thường vào đầu tuần Thứ 2).</span>
+                        </div>
+                        <div class="guide-color-item item-orange">
+                            <strong>Viền Cam</strong>
+                            <span>Tiết <strong>Giao ban / Hội ý</strong> hoặc sinh hoạt chuyên môn của trường.</span>
+                        </div>
+                    </div>
+                    <div class="guide-img-container">
+                        <img src="guide_images/guide_card_sample.png" alt="Mẫu thẻ giáo viên viền màu" class="guide-img" onerror="this.style.display='none'">
+                        <span class="guide-caption">Hình 1: Thẻ giáo viên với viền màu trạng thái trực quan</span>
+                    </div>
+                </div>
+
+                <!-- Mục 2: 3 Chế độ xem -->
+                <div class="guide-section">
+                    <h4 class="guide-sec-title">2. Ba Chế độ Xem (Thẻ, Lưới, Bảng)</h4>
+                    <p class="guide-desc">Thầy có thể linh hoạt chuyển đổi giữa 3 chế độ xem trên thanh điều khiển:</p>
+                    <div class="guide-img-container">
+                        <img src="guide_images/guide_view_modes.png" alt="3 chế độ xem" class="guide-img" onerror="this.style.display='none'">
+                        <span class="guide-caption">Hình 2: Các nút chuyển đổi chế độ xem</span>
+                    </div>
+                    <ul class="guide-list">
+                        <li><strong>Dạng Thẻ:</strong> Hiển thị đầy đủ thông tin từng giáo viên (họ tên, mã TKB, tổ môn, lớp chủ nhiệm, định mức tiết). Bấm nút <em>"Xem TKB tuần"</em> trên thẻ để xem chi tiết toàn bộ lịch dạy cả tuần của thầy/cô đó.</li>
+                        <li><strong>Dạng Lưới (Xem như album ảnh):</strong> Các ô thẻ nhỏ gọn xếp liền nhau dạng lưới, giúp Thầy nhìn bao quát cùng lúc 111 giáo viên toàn trường trên một màn hình duy nhất mà không phải cuộn trang nhiều. Bấm vào ô bất kỳ để mở lịch tuần.</li>
+                        <li><strong>Dạng Bảng:</strong> Hiển thị toàn bộ thời khóa biểu nhà trường từ Thứ 2 đến Thứ 7 theo từng tiết (Sáng & Chiều). Ô tiết học đang diễn ra sẽ tự động phát sáng.</li>
+                    </ul>
+                </div>
+
+                <!-- Mục 3: Lọc & Tìm kiếm nhanh -->
+                <div class="guide-section">
+                    <h4 class="guide-sec-title">3. Cách Lọc và Tra cứu Giáo viên</h4>
+                    <p class="guide-desc">Thầy có thể lọc danh sách theo nhiều cách rất nhanh chóng:</p>
+                    <div class="guide-img-container">
+                        <img src="guide_images/guide_stat_boxes.png" alt="4 ô thống kê và lọc" class="guide-img" onerror="this.style.display='none'">
+                        <span class="guide-caption">Hình 3: Bấm trực tiếp vào 4 ô thống kê để lọc nhanh</span>
+                    </div>
+                    <ul class="guide-list">
+                        <li><strong>Bấm vào 4 ô thống kê trên cùng:</strong> Bấm ô <em>"Đang đứng lớp"</em> để lọc ngay các thầy cô đang dạy; bấm ô <em>"Đang rảnh"</em> để lọc thầy cô đang trống tiết; bấm <em>"Tổng số giáo viên"</em> để xem lại tất cả.</li>
+                        <li><strong>Tìm kiếm theo tên:</strong> Gõ tên hoặc mã viết tắt vào ô tìm kiếm (ví dụ: <em>Hồng</em>, <em>Phi</em>, <em>Toán</em>...).</li>
+                        <li><strong>Lọc theo Tổ chuyên môn:</strong> Chọn tổ Toán, Lí, Hóa, Văn, Ngoại ngữ... từ danh sách thả xuống.</li>
+                        <li><strong>Tra cứu thời điểm khác:</strong> Chọn <em>"Chọn thời điểm tra cứu"</em> trên thanh điều khiển để xem trước lịch của bất kỳ Thứ / Buổi / Tiết nào trong tuần.</li>
+                    </ul>
+                </div>
+
+                <!-- Mục 4: Bố trí dạy thay -->
+                <div class="guide-section">
+                    <h4 class="guide-sec-title">4. Cách Tìm Giáo viên để Bố trí Dạy thay</h4>
+                    <ol class="guide-list-ordered">
+                        <li>Chuyển sang <strong>Dạng Bảng</strong> (hoặc chọn Thứ/Tiết cần phân công).</li>
+                        <li>Bấm trực tiếp vào ô tiết học cần tìm giáo viên dạy thay.</li>
+                        <li>Trong cửa sổ chi tiết hiện ra, chuyển sang tab <strong>"Đang rảnh / Trống tiết"</strong>.</li>
+                        <li>Bấm nút <strong>"Sao chép danh sách"</strong> để sao chép danh sách các thầy cô rảnh vào bộ nhớ tạm, sau đó dán vào Zalo/văn bản gửi cho bộ phận học vụ điều động ngay lập tức.</li>
+                    </ol>
+                    <div class="guide-img-container">
+                        <img src="guide_images/guide_table_sample.png" alt="Chi tiết tiết học và danh sách giáo viên rảnh" class="guide-img" onerror="this.style.display='none'">
+                        <span class="guide-caption">Hình 4: Xem danh sách giáo viên rảnh trong từng tiết</span>
+                    </div>
+                </div>
+
+                <!-- Mục 5: Nạp file TKB mới & Thoát -->
+                <div class="guide-section">
+                    <h4 class="guide-sec-title">5. Nạp File Mới & Thoát Phần Mềm</h4>
+                    <div class="guide-img-container">
+                        <img src="guide_images/guide_buttons.png" alt="Nút Nạp file TKB, Hướng dẫn sử dụng và Thoát" class="guide-img" onerror="this.style.display='none'">
+                        <span class="guide-caption">Hình 5: Các nút tác vụ trên thanh tiêu đề</span>
+                    </div>
+                    <ul class="guide-list">
+                        <li><strong>Khi trường đổi Thời khóa biểu mới:</strong> Bấm nút <em>"Nạp file TKB (Excel)"</em> ở góc phải trên cùng, chọn file Excel TKB mới của trường. Hệ thống sẽ tự động cập nhật cơ sở dữ liệu và hiển thị lịch mới ngay trong 2 giây.</li>
+                        <li><strong>Khi kết thúc làm việc (Thoát):</strong> Bấm nút <em>"Thoát"</em> màu đỏ ở góc phải trên cùng và bấm <em>"Xác nhận Thoát"</em>, hoặc bấm nút dấu nhân [X] ở góc cửa sổ. Phần mềm sẽ dừng máy chủ và đóng lại an toàn.</li>
+                    </ul>
+                </div>
+
+                <!-- Mục 6: Chỉnh sửa khung giờ học -->
+                <div class="guide-section">
+                    <h4 class="guide-sec-title">6. Chỉnh sửa Khung Giờ Học (Cấu trúc 10 Tiết Chuẩn)</h4>
+                    <p class="guide-desc">Khi nhà trường điều chỉnh giờ vào học hoặc giờ chuyển tiết, Thầy có thể chỉnh sửa khung giờ học rất dễ dàng và linh hoạt:</p>
+                    <ul class="guide-list">
+                        <li><strong>Cách 1 (Sửa nhanh trực tiếp trên bảng):</strong> Chuyển sang <strong>Dạng Bảng</strong>, bấm trực tiếp vào bất kỳ ô <em>Tiết</em> hoặc ô <em>Khung giờ</em> nào ở cột bên trái. Ô đó sẽ mở hộp sửa giờ ngay tại chỗ: Thầy gõ giờ bắt đầu và kết thúc rồi bấm nút <strong>Lưu</strong> (hoặc nhấn phím Enter) để lưu ngay.</li>
+                        <li><strong>Cách 2 (Bảng quản lý 10 tiết):</strong> Bấm nút <em>"Khung giờ học"</em> trên thanh tiêu đề (hoặc nút <em>"Chỉnh sửa khung giờ"</em> ở Dạng Bảng). Màn hình sẽ hiện toàn bộ 10 tiết (5 tiết Sáng & 5 tiết Chiều). Thầy có thể gõ trực tiếp giờ học cho từng tiết và bấm <strong>Lưu</strong> ở từng dòng hoặc <strong>Lưu tất cả thay đổi</strong> ở cuối bảng.</li>
+                        <li><strong>Nhập thủ công dễ dàng:</strong> Cho phép gõ phím trực tiếp các con số theo định dạng <code>HH:MM</code> (ví dụ: 07:15, 08:00) hoặc dùng bộ chọn giờ.</li>
+                        <li><strong>Cố định 10 tiết:</strong> Hệ thống giữ nguyên cấu trúc chuẩn 10 tiết (Sáng: Tiết 1 - 5, Chiều: Tiết 1 - 5), chỉ cho phép điều chỉnh khung giờ để bảo toàn tính toàn vẹn học vụ.</li>
+                        <li><strong>Tự động tính giờ ra chơi & nghỉ trưa:</strong> Khi thay đổi giờ tiết học, hệ thống sẽ tự động tính lại giờ ra chơi buổi sáng, nghỉ trưa và ra chơi buổi chiều. Đồng hồ giám sát và chỉ số thời gian thực trên thanh tiêu đề cũng sẽ tự động chuyển trạng thái theo giờ mới.</li>
+                        <li><strong>Khôi phục giờ chuẩn:</strong> Bất cứ lúc nào Thầy muốn quay lại giờ ban đầu của trường (Sáng 7:00 - 11:20, Chiều 13:15 - 17:35), chỉ cần bấm nút <em>"Khôi phục giờ chuẩn"</em>.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="btnDismissGuideModal">Đã hiểu, đóng hướng dẫn</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: XÁC NHẬN THOÁT HỆ THỐNG -->
+    <div class="modal-overlay" id="exitConfirmModal">
+        <div class="modal-box" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3 class="modal-title" style="color: #991b1b;">Xác nhận Thoát Hệ thống</h3>
+                <button class="btn-close-modal" id="btnCloseExitModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 14px; color: var(--text-main); line-height: 1.6;">
+                    Thầy có chắc chắn muốn thoát khỏi chương trình?<br>
+                    Máy chủ giám sát thời khóa biểu tại chỗ sẽ được tắt an toàn.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnCancelExit">Hủy bỏ</button>
+                <button class="btn btn-danger" id="btnConfirmExit">Xác nhận Thoát</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FULLSCREEN SHUTDOWN SCREEN -->
+    <div class="shutdown-screen" id="shutdownScreen" style="display: none;">
+        <div class="shutdown-card">
+            <h2>HỆ THỐNG ĐÃ TẮT AN TOÀN</h2>
+            <p>Máy chủ giám sát thời khóa biểu đã dừng hoạt động thành công.</p>
+            <p class="shutdown-hint">Thầy có thể đóng cửa sổ trình duyệt này hoặc đóng tab hiện tại.</p>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

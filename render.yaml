@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: tkb-thpt-nguyenhue
+    runtime: python
+    rootDir: SourceCode
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: AUTH_ENABLED
+        value: "true"
+      - key: ALLOW_DEMO_LOGIN
+        value: "true"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: ALLOWED_EMAILS
+        sync: false
+      - key: ALLOWED_DOMAINS
+        value: "ninhthuan.edu.vn"
+      - key: SESSION_SECRET
+        generateValue: true
