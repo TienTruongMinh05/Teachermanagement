@@ -411,10 +411,6 @@ function renderGoogleSignInButton() {
                     callback: handleGoogleCredentialResponse,
                     auto_select: false
                 };
-                const primaryDomain = state.authConfig?.allowed_domains?.split(',')[0]?.trim();
-                if (primaryDomain && primaryDomain !== '*') {
-                    gisConfig.hd = primaryDomain;
-                }
                 google.accounts.id.initialize(gisConfig);
                 container.innerHTML = '';
                 google.accounts.id.renderButton(container, {
