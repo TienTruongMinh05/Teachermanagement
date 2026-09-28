@@ -21,6 +21,6 @@ services:
       - key: ALLOWED_EMAILS
         sync: false
       - key: ALLOWED_DOMAINS
-        value: "ninhthuan.edu.vn"
+        value: "*"
       - key: SESSION_SECRET
         generateValue: true

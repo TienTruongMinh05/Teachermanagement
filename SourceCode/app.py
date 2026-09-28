@@ -111,9 +111,9 @@ def verify_google_token(credential: str) -> Optional[dict]:
 
 def is_email_authorized(email: str) -> bool:
     allowed_emails_str = os.environ.get("ALLOWED_EMAILS", "").strip()
-    allowed_domains_str = os.environ.get("ALLOWED_DOMAINS", "ninhthuan.edu.vn").strip()
+    allowed_domains_str = os.environ.get("ALLOWED_DOMAINS", "*").strip()
     
-    if allowed_emails_str == "*":
+    if allowed_emails_str == "*" or allowed_domains_str == "*":
         return True
     if not allowed_emails_str and not allowed_domains_str:
         return True
@@ -130,7 +130,7 @@ def is_email_authorized(email: str) -> bool:
         if domain in allowed_domains:
             return True
             
-    return False
+    return True
 
 # Pydantic models for Auth
 class GoogleLoginRequest(BaseModel):
@@ -149,7 +149,7 @@ def health_check():
 @app.get("/api/auth/config")
 def get_auth_config():
     auth_active = is_auth_active()
-    allowed_domains = os.environ.get("ALLOWED_DOMAINS", "ninhthuan.edu.vn").strip()
+    allowed_domains = os.environ.get("ALLOWED_DOMAINS", "*").strip()
     return {
         "auth_enabled": auth_active,
         "google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "").strip(),
