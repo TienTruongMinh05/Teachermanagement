@@ -124,8 +124,8 @@ class DemoLoginRequest(BaseModel):
     name: Optional[str] = "Thầy Cô (Demo - Sở GD&ĐT Ninh Thuận)"
 
 # Health check endpoints (for UptimeRobot / Render keep-alive / Monitoring)
-@app.get("/health")
-@app.get("/api/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health_check():
     return {
         "status": "healthy",
