@@ -9,6 +9,7 @@ import hmac
 import hashlib
 import json
 import base64
+import datetime
 import requests
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Header
@@ -121,6 +122,16 @@ class GoogleLoginRequest(BaseModel):
 class DemoLoginRequest(BaseModel):
     email: Optional[str] = "giaovien.demo@ninhthuan.edu.vn"
     name: Optional[str] = "Thầy Cô (Demo - Sở GD&ĐT Ninh Thuận)"
+
+# Health check endpoints (for UptimeRobot / Render keep-alive / Monitoring)
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "service": "tkb-thpt-nguyenhue",
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
 
 @app.get("/api/auth/config")
 def get_auth_config():
