@@ -662,6 +662,7 @@ async function fetchBellSchedule() {
 
 async function pollRealtimeStatus() {
     try {
+        await fetchBellSchedule();
         const res = await fetch('/api/status');
         if (!res.ok) return;
         const data = await res.json();
@@ -706,6 +707,7 @@ async function pollRealtimeStatus() {
 }
 
 async function refreshAllData() {
+    await fetchBellSchedule();
     await pollRealtimeStatus();
     await fetchTeachers();
     await fetchClassesStatus();
@@ -1554,8 +1556,9 @@ function copyFreeTeachersToClipboard() {
 }
 
 // Modal: Bell Schedule & Period Time Manager
-function openBellScheduleModal(highlightSession = null, highlightPeriod = null) {
+async function openBellScheduleModal(highlightSession = null, highlightPeriod = null) {
     if (!el.bellScheduleModal) return;
+    await fetchBellSchedule();
     el.bellScheduleModal.classList.add('show');
     renderBellManageTable(highlightSession, highlightPeriod);
 }
