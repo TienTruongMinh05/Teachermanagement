@@ -1709,15 +1709,87 @@ body {
 }
 
 .bell-recess-row {
-    background: #f8fafc;
-    color: #64748b;
-    font-style: italic;
-    font-size: 12px;
+    background: #f0f9ff;
+    color: #0369a1;
+    font-size: 13px;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .bell-recess-row td {
-    padding: 6px 10px !important;
-    border-bottom: 1px dashed #cbd5e1;
+    padding: 7px 10px !important;
+    border-bottom: 2px dashed #93c5fd;
+    border-top: 1px dashed #bfdbfe;
+}
+
+.draggable-recess-row {
+    cursor: grab;
+    user-select: none;
+}
+
+.draggable-recess-row:active {
+    cursor: grabbing;
+    background: #e0f2fe;
+}
+
+.draggable-recess-row.dragging {
+    opacity: 0.45;
+    background: #bae6fd;
+}
+
+.period-row-drop-target {
+    background: rgba(37, 99, 235, 0.12) !important;
+    outline: 2px dashed #2563eb !important;
+}
+
+.recess-drag-handle {
+    cursor: grab;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;
+    margin-right: 6px;
+    background: #bae6fd;
+    color: #0369a1;
+    border-radius: 4px;
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: -1px;
+}
+
+.recess-drag-handle:hover {
+    background: #7dd3fc;
+}
+
+.btn-move-recess {
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid #7dd3fc;
+    background: #ffffff;
+    color: #0284c7;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-move-recess:hover {
+    background: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+}
+
+.recess-pos-select {
+    padding: 2px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0369a1;
+    border: 1px solid #7dd3fc;
+    border-radius: 4px;
+    background: #ffffff;
+    cursor: pointer;
 }
 
 .bell-time-input {

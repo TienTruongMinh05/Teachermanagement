@@ -13,7 +13,7 @@ import datetime
 import requests
 import logging
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Header, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Header, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -630,7 +630,13 @@ def get_metadata():
 # API: Bell schedule
 @app.get("/api/bell-schedule")
 def get_bell_schedule():
-    return database.get_bell_schedule()
+    sched = database.get_bell_schedule()
+    recess_pos = database.get_recess_positions()
+    return {
+        "schedule": sched,
+        "recess_after_sang": recess_pos["recess_after_sang"],
+        "recess_after_chieu": recess_pos["recess_after_chieu"]
+    }
 
 class BellScheduleItem(BaseModel):
     session: str = Field(..., pattern="^(sang|chieu)$")
@@ -640,14 +646,41 @@ class BellScheduleItem(BaseModel):
     label: Optional[str] = ""
 
 @app.post("/api/bell-schedule")
-def update_bell_schedule(
-    items: List[BellScheduleItem],
+async def update_bell_schedule(
+    request: Request,
     current_user: Dict[str, Any] = Depends(require_authenticated_user)
 ):
     try:
-        dict_items = [item.dict() for item in items]
-        database.update_bell_schedule(dict_items)
-        logger.info("Người dùng %s đã cập nhật toàn bộ khung giờ học", current_user.get("email"))
+        data = await request.json()
+        if isinstance(data, list):
+            raw_items = data
+            recess_sang = None
+            recess_chieu = None
+        elif isinstance(data, dict):
+            raw_items = data.get("schedule") or data.get("items") or []
+            recess_sang = data.get("recess_after_sang")
+            recess_chieu = data.get("recess_after_chieu")
+        else:
+            raw_items = []
+            recess_sang = None
+            recess_chieu = None
+
+        dict_items = []
+        for item in raw_items:
+            dict_items.append({
+                "session": item.get("session"),
+                "period": int(item.get("period")),
+                "start_time": str(item.get("start_time")),
+                "end_time": str(item.get("end_time")),
+                "label": str(item.get("label", ""))
+            })
+
+        if dict_items:
+            database.update_bell_schedule(dict_items)
+        if recess_sang is not None or recess_chieu is not None:
+            database.update_recess_metadata(recess_sang, recess_chieu)
+
+        logger.info("Người dùng %s đã cập nhật toàn bộ khung giờ học & vị trí giờ ra chơi", current_user.get("email"))
         return {"success": True, "message": "Cập nhật toàn bộ khung giờ thành công!"}
     except Exception as e:
         logger.error("Lỗi cập nhật khung giờ: %s", e)

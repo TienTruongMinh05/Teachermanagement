@@ -228,6 +228,30 @@ def update_bell_schedule(items: List[Dict[str, Any]]):
     conn.commit()
     conn.close()
 
+def get_recess_positions() -> Dict[str, int]:
+    meta = get_metadata()
+    try:
+        r_sang = int(meta.get('recess_after_sang', 2))
+    except (ValueError, TypeError):
+        r_sang = 2
+    try:
+        r_chieu = int(meta.get('recess_after_chieu', 2))
+    except (ValueError, TypeError):
+        r_chieu = 2
+    return {'recess_after_sang': max(1, min(4, r_sang)), 'recess_after_chieu': max(1, min(4, r_chieu))}
+
+def update_recess_metadata(recess_after_sang: Optional[int] = None, recess_after_chieu: Optional[int] = None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    if recess_after_sang is not None:
+        val = max(1, min(4, int(recess_after_sang)))
+        cursor.execute('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)', ('recess_after_sang', str(val)))
+    if recess_after_chieu is not None:
+        val = max(1, min(4, int(recess_after_chieu)))
+        cursor.execute('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)', ('recess_after_chieu', str(val)))
+    conn.commit()
+    conn.close()
+
 def reset_bell_schedule_to_default():
     conn = get_connection()
     cursor = conn.cursor()
@@ -237,6 +261,8 @@ def reset_bell_schedule_to_default():
         INSERT INTO bell_schedule (session, period, start_time, end_time, label)
         VALUES (?, ?, ?, ?, ?)
         ''', (b['session'], b['period'], b['start_time'], b['end_time'], b['label']))
+    cursor.execute('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)', ('recess_after_sang', '2'))
+    cursor.execute('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)', ('recess_after_chieu', '2'))
     conn.commit()
     conn.close()
 

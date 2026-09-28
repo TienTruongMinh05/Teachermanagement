@@ -45,6 +45,8 @@ const state = {
     lastClassCellDetail: null,
 
     bellSchedule: [],
+    recessAfterSang: 2,
+    recessAfterChieu: 2,
     authConfig: null,
     currentUser: null,
     appInitialized: false
@@ -654,7 +656,16 @@ async function fetchBellSchedule() {
     try {
         const res = await fetch('/api/bell-schedule');
         if (!res.ok) return;
-        state.bellSchedule = await res.json();
+        const data = await res.json();
+        if (Array.isArray(data)) {
+            state.bellSchedule = data;
+            state.recessAfterSang = state.recessAfterSang || 2;
+            state.recessAfterChieu = state.recessAfterChieu || 2;
+        } else {
+            state.bellSchedule = data.schedule || [];
+            state.recessAfterSang = data.recess_after_sang || 2;
+            state.recessAfterChieu = data.recess_after_chieu || 2;
+        }
     } catch (e) {
         console.error('Lỗi tải bell schedule:', e);
     }
@@ -1087,13 +1098,16 @@ function renderMatrixTable(matrixData) {
     const curSession = curStatus ? curStatus.session : null;
     const curPeriod = curStatus ? curStatus.period : null;
 
+    const rSangPos = state.recessAfterSang || 2;
+    const rChieuPos = state.recessAfterChieu || 2;
+
     // 1. BUỔI SÁNG
     for (let p = 1; p <= 5; p++) {
-        if (p === 3) {
-            const t2 = state.bellSchedule.find(s => s.session === 'sang' && s.period === 2);
-            const t3 = state.bellSchedule.find(s => s.session === 'sang' && s.period === 3);
-            const rStart = t2 ? t2.end_time : '08:35';
-            const rEnd = t3 ? t3.start_time : '08:55';
+        if (p === rSangPos + 1) {
+            const tPrev = state.bellSchedule.find(s => s.session === 'sang' && s.period === rSangPos);
+            const tNext = state.bellSchedule.find(s => s.session === 'sang' && s.period === rSangPos + 1);
+            const rStart = tPrev ? tPrev.end_time : '08:35';
+            const rEnd = tNext ? tNext.start_time : '08:55';
             const recessRow = document.createElement('tr');
             recessRow.className = 'recess-row';
             recessRow.innerHTML = `<td colspan="9">RA CHƠI BUỔI SÁNG (${rStart} - ${rEnd})</td>`;
@@ -1180,11 +1194,11 @@ function renderMatrixTable(matrixData) {
 
     // 2. BUỔI CHIỀU
     for (let p = 1; p <= 5; p++) {
-        if (p === 3) {
-            const t2 = state.bellSchedule.find(s => s.session === 'chieu' && s.period === 2);
-            const t3 = state.bellSchedule.find(s => s.session === 'chieu' && s.period === 3);
-            const rStart = t2 ? t2.end_time : '14:50';
-            const rEnd = t3 ? t3.start_time : '15:10';
+        if (p === rChieuPos + 1) {
+            const tPrev = state.bellSchedule.find(s => s.session === 'chieu' && s.period === rChieuPos);
+            const tNext = state.bellSchedule.find(s => s.session === 'chieu' && s.period === rChieuPos + 1);
+            const rStart = tPrev ? tPrev.end_time : '14:50';
+            const rEnd = tNext ? tNext.start_time : '15:10';
             const recessRow = document.createElement('tr');
             recessRow.className = 'recess-row';
             recessRow.innerHTML = `<td colspan="9">RA CHƠI BUỔI CHIỀU (${rStart} - ${rEnd})</td>`;
@@ -1571,12 +1585,152 @@ function renderBellManageTable(highlightSession = null, highlightPeriod = null) 
         if (!start || !end) return '';
         const [sh, sm] = start.split(':').map(Number);
         const [eh, em] = end.split(':').map(Number);
+        if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return '';
         const diff = (eh * 60 + em) - (sh * 60 + sm);
-        return diff > 0 ? `${diff} phút` : '--';
+        if (diff <= 0) return '--';
+        const hrs = Math.floor(diff / 60);
+        const mins = diff % 60;
+        if (hrs > 0) {
+            return mins > 0 ? `${hrs}h ${mins}p` : `${hrs} giờ`;
+        }
+        return `${mins} phút`;
     }
 
     const morning = state.bellSchedule.filter(s => s.session === 'sang').sort((a,b) => a.period - b.period);
     const afternoon = state.bellSchedule.filter(s => s.session === 'chieu').sort((a,b) => a.period - b.period);
+
+    const rSangPos = state.recessAfterSang || 2;
+    const rChieuPos = state.recessAfterChieu || 2;
+
+    let targetInputToFocus = null;
+
+    // Helper: Create Recess Row with Drag & Drop and Move Controls
+    function createRecessRow(session) {
+        const isSang = session === 'sang';
+        const curPos = isSang ? rSangPos : rChieuPos;
+        const sLabel = isSang ? 'Sáng' : 'Chiều';
+        const titleText = `RA CHƠI BUỔI ${sLabel.toUpperCase()}`;
+        
+        const prevItem = (isSang ? morning : afternoon).find(s => s.period === curPos);
+        const nextItem = (isSang ? morning : afternoon).find(s => s.period === curPos + 1);
+        
+        const rStart = prevItem ? prevItem.end_time : (isSang ? '08:35' : '14:50');
+        const rEnd = nextItem ? nextItem.start_time : (isSang ? '08:55' : '15:10');
+        const dur = calcDuration(rStart, rEnd);
+
+        const tr = document.createElement('tr');
+        tr.className = 'bell-recess-row draggable-recess-row';
+        tr.setAttribute('draggable', 'true');
+        tr.dataset.session = session;
+
+        let posOptions = '';
+        for (let p = 1; p <= 4; p++) {
+            posOptions += `<option value="${p}" ${p === curPos ? 'selected' : ''}>Sau Tiết ${p}</option>`;
+        }
+
+        tr.innerHTML = `
+            <td>
+                <span class="recess-drag-handle" title="Kéo thả để di chuyển tiết ra chơi">⋮⋮</span>
+                <strong style="color: #0284c7;">${titleText}</strong>
+            </td>
+            <td>
+                <input type="time" class="bell-time-input" id="modal_recess_start_${session}" value="${rStart}">
+            </td>
+            <td class="text-center" style="color: #0284c7; font-weight: bold;">-</td>
+            <td>
+                <input type="time" class="bell-time-input" id="modal_recess_end_${session}" value="${rEnd}">
+            </td>
+            <td class="text-center" id="modal_recess_dur_${session}"><span class="badge-tt" style="background: #e0f2fe; color: #0369a1;">${dur}</span></td>
+            <td class="text-center">
+                <div style="display: inline-flex; gap: 4px; align-items: center;">
+                    <button class="btn-move-recess btn-recess-up" title="Chuyển ra chơi lên tiết trước" ${curPos <= 1 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>▲</button>
+                    <button class="btn-move-recess btn-recess-down" title="Chuyển ra chơi xuống tiết sau" ${curPos >= 4 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>▼</button>
+                    <select class="recess-pos-select" title="Chọn vị trí ra chơi">${posOptions}</select>
+                </div>
+            </td>
+        `;
+
+        const sInp = tr.querySelector(`#modal_recess_start_${session}`);
+        const eInp = tr.querySelector(`#modal_recess_end_${session}`);
+        const durTd = tr.querySelector(`#modal_recess_dur_${session}`);
+
+        sInp.addEventListener('input', () => {
+            const periodEndInp = document.getElementById(`modal_end_${session}_${curPos}`);
+            if (periodEndInp) periodEndInp.value = sInp.value;
+            durTd.innerHTML = `<span class="badge-tt" style="background: #e0f2fe; color: #0369a1;">${calcDuration(sInp.value, eInp.value)}</span>`;
+            updateRecessSummary();
+        });
+
+        eInp.addEventListener('input', () => {
+            const periodStartInp = document.getElementById(`modal_start_${session}_${curPos + 1}`);
+            if (periodStartInp) periodStartInp.value = eInp.value;
+            durTd.innerHTML = `<span class="badge-tt" style="background: #e0f2fe; color: #0369a1;">${calcDuration(sInp.value, eInp.value)}</span>`;
+            updateRecessSummary();
+        });
+
+        tr.querySelector('.btn-recess-up').onclick = (e) => {
+            e.stopPropagation();
+            if (curPos > 1) {
+                if (isSang) state.recessAfterSang--;
+                else state.recessAfterChieu--;
+                renderBellManageTable(highlightSession, highlightPeriod);
+            }
+        };
+
+        tr.querySelector('.btn-recess-down').onclick = (e) => {
+            e.stopPropagation();
+            if (curPos < 4) {
+                if (isSang) state.recessAfterSang++;
+                else state.recessAfterChieu++;
+                renderBellManageTable(highlightSession, highlightPeriod);
+            }
+        };
+
+        tr.querySelector('.recess-pos-select').onchange = (e) => {
+            const val = parseInt(e.target.value);
+            if (val >= 1 && val <= 4) {
+                if (isSang) state.recessAfterSang = val;
+                else state.recessAfterChieu = val;
+                renderBellManageTable(highlightSession, highlightPeriod);
+            }
+        };
+
+        tr.addEventListener('dragstart', (e) => {
+            tr.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', session);
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        tr.addEventListener('dragend', () => {
+            tr.classList.remove('dragging');
+            document.querySelectorAll('.period-row-drop-target').forEach(el => el.classList.remove('period-row-drop-target'));
+        });
+
+        return tr;
+    }
+
+    // Helper: Make Period Row Draggable Target
+    function attachDropTarget(tr, session, period) {
+        if (period > 4) return;
+        tr.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            tr.classList.add('period-row-drop-target');
+        });
+        tr.addEventListener('dragleave', () => {
+            tr.classList.remove('period-row-drop-target');
+        });
+        tr.addEventListener('drop', (e) => {
+            e.preventDefault();
+            tr.classList.remove('period-row-drop-target');
+            const draggedSession = e.dataTransfer.getData('text/plain');
+            if (draggedSession === session) {
+                if (session === 'sang') state.recessAfterSang = period;
+                else state.recessAfterChieu = period;
+                renderBellManageTable(highlightSession, highlightPeriod);
+            }
+        });
+    }
 
     // 1. BUỔI SÁNG HEADER
     const rowSangHeader = document.createElement('tr');
@@ -1584,25 +1738,7 @@ function renderBellManageTable(highlightSession = null, highlightPeriod = null) 
     rowSangHeader.innerHTML = `<td colspan="6">BUỔI SÁNG (TIẾT 1 - TIẾT 5)</td>`;
     el.tbodyBellManage.appendChild(rowSangHeader);
 
-    let targetInputToFocus = null;
-
     morning.forEach(item => {
-        if (item.period === 3) {
-            const t2 = morning.find(s => s.period === 2);
-            const recessRow = document.createElement('tr');
-            recessRow.className = 'bell-recess-row';
-            const rStart = t2 ? t2.end_time : '08:35';
-            const rEnd = item.start_time;
-            const rDur = calcDuration(rStart, rEnd);
-            recessRow.innerHTML = `
-                <td colspan="6">
-                    <span style="color: #0f2438; font-weight: 700;">RA CHƠI BUỔI SÁNG:</span> 
-                    <strong>${rStart} - ${rEnd}</strong> (${rDur})
-                </td>
-            `;
-            el.tbodyBellManage.appendChild(recessRow);
-        }
-
         const tr = document.createElement('tr');
         const isTarget = highlightSession === 'sang' && highlightPeriod === item.period;
         if (isTarget) tr.classList.add('highlight-target');
@@ -1636,11 +1772,16 @@ function renderBellManageTable(highlightSession = null, highlightPeriod = null) 
         eInp.addEventListener('input', updateDur);
 
         tr.querySelector(`#btnModalSave_sang_${item.period}`).onclick = () => saveSinglePeriodFromModal('sang', item.period);
-
         if (isTarget) targetInputToFocus = sInp;
+
+        attachDropTarget(tr, 'sang', item.period);
+
+        if (item.period === rSangPos) {
+            el.tbodyBellManage.appendChild(createRecessRow('sang'));
+        }
     });
 
-    // LUNCH BREAK
+    // 2. NGHỈ TRƯA
     const m_t5 = morning.find(s => s.period === 5);
     const a_t1 = afternoon.find(s => s.period === 1);
     const lunchRow = document.createElement('tr');
@@ -1648,15 +1789,41 @@ function renderBellManageTable(highlightSession = null, highlightPeriod = null) 
     lunchRow.style.background = '#f1f5f9';
     const lStart = m_t5 ? m_t5.end_time : '11:20';
     const lEnd = a_t1 ? a_t1.start_time : '13:15';
+    const lDur = calcDuration(lStart, lEnd);
+
     lunchRow.innerHTML = `
-        <td colspan="6" style="padding: 8px 10px !important;">
-            <span style="color: #0f2438; font-weight: 700;">NGHỈ TRƯA:</span> 
-            <strong>${lStart} - ${lEnd}</strong> (${calcDuration(lStart, lEnd)})
+        <td><strong style="color: #0f2438;">NGHỈ TRƯA</strong></td>
+        <td>
+            <input type="time" class="bell-time-input" id="modal_lunch_start" value="${lStart}">
         </td>
+        <td class="text-center" style="color: #64748b; font-weight: bold;">-</td>
+        <td>
+            <input type="time" class="bell-time-input" id="modal_lunch_end" value="${lEnd}">
+        </td>
+        <td class="text-center" id="modal_lunch_dur"><span class="badge-tt" style="background: #e2e8f0; color: #334155;">${lDur}</span></td>
+        <td class="text-center" style="font-size: 11px; color: #64748b;">Chuyển tiết</td>
     `;
     el.tbodyBellManage.appendChild(lunchRow);
 
-    // 2. BUỔI CHIỀU HEADER
+    const lStartInp = lunchRow.querySelector('#modal_lunch_start');
+    const lEndInp = lunchRow.querySelector('#modal_lunch_end');
+    const lDurTd = lunchRow.querySelector('#modal_lunch_dur');
+
+    lStartInp.addEventListener('input', () => {
+        const m5End = document.getElementById('modal_end_sang_5');
+        if (m5End) m5End.value = lStartInp.value;
+        lDurTd.innerHTML = `<span class="badge-tt" style="background: #e2e8f0; color: #334155;">${calcDuration(lStartInp.value, lEndInp.value)}</span>`;
+        updateRecessSummary();
+    });
+
+    lEndInp.addEventListener('input', () => {
+        const a1Start = document.getElementById('modal_start_chieu_1');
+        if (a1Start) a1Start.value = lEndInp.value;
+        lDurTd.innerHTML = `<span class="badge-tt" style="background: #e2e8f0; color: #334155;">${calcDuration(lStartInp.value, lEndInp.value)}</span>`;
+        updateRecessSummary();
+    });
+
+    // 3. BUỔI CHIỀU HEADER
     const rowChieuHeader = document.createElement('tr');
     rowChieuHeader.className = 'bell-session-divider';
     rowChieuHeader.style.background = '#fef3c7';
@@ -1665,22 +1832,6 @@ function renderBellManageTable(highlightSession = null, highlightPeriod = null) 
     el.tbodyBellManage.appendChild(rowChieuHeader);
 
     afternoon.forEach(item => {
-        if (item.period === 3) {
-            const t2 = afternoon.find(s => s.period === 2);
-            const recessRow = document.createElement('tr');
-            recessRow.className = 'bell-recess-row';
-            const rStart = t2 ? t2.end_time : '14:50';
-            const rEnd = item.start_time;
-            const rDur = calcDuration(rStart, rEnd);
-            recessRow.innerHTML = `
-                <td colspan="6">
-                    <span style="color: #0f2438; font-weight: 700;">RA CHƠI BUỔI CHIỀU:</span> 
-                    <strong>${rStart} - ${rEnd}</strong> (${rDur})
-                </td>
-            `;
-            el.tbodyBellManage.appendChild(recessRow);
-        }
-
         const tr = document.createElement('tr');
         const isTarget = highlightSession === 'chieu' && highlightPeriod === item.period;
         if (isTarget) tr.classList.add('highlight-target');
@@ -1714,8 +1865,13 @@ function renderBellManageTable(highlightSession = null, highlightPeriod = null) 
         eInp.addEventListener('input', updateDur);
 
         tr.querySelector(`#btnModalSave_chieu_${item.period}`).onclick = () => saveSinglePeriodFromModal('chieu', item.period);
-
         if (isTarget) targetInputToFocus = sInp;
+
+        attachDropTarget(tr, 'chieu', item.period);
+
+        if (item.period === rChieuPos) {
+            el.tbodyBellManage.appendChild(createRecessRow('chieu'));
+        }
     });
 
     updateRecessSummary();
@@ -1730,22 +1886,29 @@ function renderBellManageTable(highlightSession = null, highlightPeriod = null) 
 
 function updateRecessSummary() {
     if (!el.bellRecessInfo) return;
+    const rSangPos = state.recessAfterSang || 2;
+    const rChieuPos = state.recessAfterChieu || 2;
+
     const m1_s = document.getElementById('modal_start_sang_1')?.value || '07:00';
     const m5_e = document.getElementById('modal_end_sang_5')?.value || '11:20';
     const a1_s = document.getElementById('modal_start_chieu_1')?.value || '13:15';
     const a5_e = document.getElementById('modal_end_chieu_5')?.value || '17:35';
 
-    const m2_e = document.getElementById('modal_end_sang_2')?.value || '08:35';
-    const m3_s = document.getElementById('modal_start_sang_3')?.value || '08:55';
+    const m_recess_end_inp = document.getElementById(`modal_end_sang_${rSangPos}`);
+    const m_recess_start_next_inp = document.getElementById(`modal_start_sang_${rSangPos + 1}`);
+    const m_r_start = m_recess_end_inp ? m_recess_end_inp.value : '08:35';
+    const m_r_end = m_recess_start_next_inp ? m_recess_start_next_inp.value : '08:55';
 
-    const a2_e = document.getElementById('modal_end_chieu_2')?.value || '14:50';
-    const a3_s = document.getElementById('modal_start_chieu_3')?.value || '15:10';
+    const a_recess_end_inp = document.getElementById(`modal_end_chieu_${rChieuPos}`);
+    const a_recess_start_next_inp = document.getElementById(`modal_start_chieu_${rChieuPos + 1}`);
+    const a_r_start = a_recess_end_inp ? a_recess_end_inp.value : '14:50';
+    const a_r_end = a_recess_start_next_inp ? a_recess_start_next_inp.value : '15:10';
 
     el.bellRecessInfo.innerHTML = `
         <div class="summary-col">
             <div class="summary-col-label">BUỔI SÁNG</div>
             <div class="summary-col-time">${m1_s} – ${m5_e}</div>
-            <div class="summary-col-sub">Ra chơi: <strong>${m2_e} – ${m3_s}</strong></div>
+            <div class="summary-col-sub">Ra chơi (sau T${rSangPos}): <strong>${m_r_start} – ${m_r_end}</strong></div>
         </div>
         <div class="summary-col summary-col-center">
             <div class="summary-col-label">NGHỈ TRƯA</div>
@@ -1755,7 +1918,7 @@ function updateRecessSummary() {
         <div class="summary-col">
             <div class="summary-col-label">BUỔI CHIỀU</div>
             <div class="summary-col-time">${a1_s} – ${a5_e}</div>
-            <div class="summary-col-sub">Ra chơi: <strong>${a2_e} – ${a3_s}</strong></div>
+            <div class="summary-col-sub">Ra chơi (sau T${rChieuPos}): <strong>${a_r_start} – ${a_r_end}</strong></div>
         </div>
     `;
 }
@@ -1796,6 +1959,7 @@ async function saveSinglePeriodFromModal(session, period) {
         await fetchBellSchedule();
         await pollRealtimeStatus();
         renderMatrixTable(state.matrix);
+        renderClassMatrixTable(state.classMatrix);
         renderBellManageTable(session, period);
     } catch (e) {
         showToast('Lỗi khi lưu: ' + e.message, 'error');
@@ -1833,18 +1997,24 @@ async function saveAllBellSchedule() {
     }
 
     try {
+        const payload = {
+            schedule: items,
+            recess_after_sang: state.recessAfterSang || 2,
+            recess_after_chieu: state.recessAfterChieu || 2
+        };
         const res = await fetch('/api/bell-schedule', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(items)
+            body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error('Lỗi cập nhật máy chủ');
         
-        showToast('Đã lưu thành công toàn bộ khung giờ 10 tiết!');
+        showToast('Đã lưu thành công toàn bộ khung giờ & vị trí tiết ra chơi!');
         el.bellScheduleModal.classList.remove('show');
         await fetchBellSchedule();
         await pollRealtimeStatus();
         renderMatrixTable(state.matrix);
+        renderClassMatrixTable(state.classMatrix);
     } catch (e) {
         showToast('Lỗi khi lưu khung giờ: ' + e.message, 'error');
     }
@@ -1860,14 +2030,19 @@ async function resetBellScheduleToDefault() {
                 if (!res.ok) throw new Error('Lỗi máy chủ');
                 
                 showToast('Đã khôi phục khung giờ chuẩn mặc định thành công!');
+                state.recessAfterSang = 2;
+                state.recessAfterChieu = 2;
                 await fetchBellSchedule();
                 await pollRealtimeStatus();
                 renderMatrixTable(state.matrix);
+                renderClassMatrixTable(state.classMatrix);
                 renderBellManageTable();
             } catch (e) {
                 showToast('Lỗi khôi phục: ' + e.message, 'error');
             }
-        },
+        }
+    );
+},
         'btn-primary',
         'Khôi phục'
     );
@@ -2156,13 +2331,16 @@ function renderClassMatrixTable(matrixData) {
     const curPeriod = curStatus ? curStatus.period : null;
     const isSchoolTime = curStatus ? curStatus.is_school_time : false;
 
+    const rSangPos = state.recessAfterSang || 2;
+    const rChieuPos = state.recessAfterChieu || 2;
+
     // 1. BUỔI SÁNG
     for (let p = 1; p <= 5; p++) {
-        if (p === 3) {
-            const t2 = (state.bellSchedule || []).find(s => s.session === 'sang' && s.period === 2);
-            const t3 = (state.bellSchedule || []).find(s => s.session === 'sang' && s.period === 3);
-            const rStart = t2 ? t2.end_time : '08:35';
-            const rEnd = t3 ? t3.start_time : '08:55';
+        if (p === rSangPos + 1) {
+            const tPrev = (state.bellSchedule || []).find(s => s.session === 'sang' && s.period === rSangPos);
+            const tNext = (state.bellSchedule || []).find(s => s.session === 'sang' && s.period === rSangPos + 1);
+            const rStart = tPrev ? tPrev.end_time : '08:35';
+            const rEnd = tNext ? tNext.start_time : '08:55';
             const recessRow = document.createElement('tr');
             recessRow.className = 'recess-row';
             recessRow.innerHTML = `<td colspan="9">RA CHƠI BUỔI SÁNG (${rStart} - ${rEnd})</td>`;
@@ -2249,11 +2427,11 @@ function renderClassMatrixTable(matrixData) {
 
     // 2. BUỔI CHIỀU
     for (let p = 1; p <= 5; p++) {
-        if (p === 3) {
-            const t2 = (state.bellSchedule || []).find(s => s.session === 'chieu' && s.period === 2);
-            const t3 = (state.bellSchedule || []).find(s => s.session === 'chieu' && s.period === 3);
-            const rStart = t2 ? t2.end_time : '14:50';
-            const rEnd = t3 ? t3.start_time : '15:10';
+        if (p === rChieuPos + 1) {
+            const tPrev = (state.bellSchedule || []).find(s => s.session === 'chieu' && s.period === rChieuPos);
+            const tNext = (state.bellSchedule || []).find(s => s.session === 'chieu' && s.period === rChieuPos + 1);
+            const rStart = tPrev ? tPrev.end_time : '14:50';
+            const rEnd = tNext ? tNext.start_time : '15:10';
             const recessRow = document.createElement('tr');
             recessRow.className = 'recess-row';
             recessRow.innerHTML = `<td colspan="9">RA CHƠI BUỔI CHIỀU (${rStart} - ${rEnd})</td>`;
@@ -2396,13 +2574,16 @@ async function openClassScheduleModal(className) {
             return tr;
         }
 
+        const rSangPos = state.recessAfterSang || 2;
+        const rChieuPos = state.recessAfterChieu || 2;
+
         // Buổi Sáng: 5 tiết + ra chơi
         for (let p = 1; p <= 5; p++) {
-            if (p === 3) {
-                const t2 = (state.bellSchedule || []).find(s => s.session === 'sang' && s.period === 2);
-                const t3 = (state.bellSchedule || []).find(s => s.session === 'sang' && s.period === 3);
-                const rStart = t2 ? t2.end_time : '08:35';
-                const rEnd = t3 ? t3.start_time : '08:55';
+            if (p === rSangPos + 1) {
+                const tPrev = (state.bellSchedule || []).find(s => s.session === 'sang' && s.period === rSangPos);
+                const tNext = (state.bellSchedule || []).find(s => s.session === 'sang' && s.period === rSangPos + 1);
+                const rStart = tPrev ? tPrev.end_time : '08:35';
+                const rEnd = tNext ? tNext.start_time : '08:55';
                 const recessRow = document.createElement('tr');
                 recessRow.className = 'recess-row';
                 recessRow.innerHTML = `<td colspan="8">RA CHƠI BUỔI SÁNG (${rStart} - ${rEnd})</td>`;
@@ -2424,11 +2605,11 @@ async function openClassScheduleModal(className) {
 
         // Buổi Chiều: 5 tiết + ra chơi
         for (let p = 1; p <= 5; p++) {
-            if (p === 3) {
-                const t2 = (state.bellSchedule || []).find(s => s.session === 'chieu' && s.period === 2);
-                const t3 = (state.bellSchedule || []).find(s => s.session === 'chieu' && s.period === 3);
-                const rStart = t2 ? t2.end_time : '14:50';
-                const rEnd = t3 ? t3.start_time : '15:10';
+            if (p === rChieuPos + 1) {
+                const tPrev = (state.bellSchedule || []).find(s => s.session === 'chieu' && s.period === rChieuPos);
+                const tNext = (state.bellSchedule || []).find(s => s.session === 'chieu' && s.period === rChieuPos + 1);
+                const rStart = tPrev ? tPrev.end_time : '14:50';
+                const rEnd = tNext ? tNext.start_time : '15:10';
                 const recessRow = document.createElement('tr');
                 recessRow.className = 'recess-row';
                 recessRow.innerHTML = `<td colspan="8">RA CHƠI BUỔI CHIỀU (${rStart} - ${rEnd})</td>`;
