@@ -2040,9 +2040,7 @@ async function resetBellScheduleToDefault() {
             } catch (e) {
                 showToast('Lỗi khôi phục: ' + e.message, 'error');
             }
-        }
-    );
-},
+        },
         'btn-primary',
         'Khôi phục'
     );
