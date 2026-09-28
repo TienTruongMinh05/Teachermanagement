@@ -298,10 +298,36 @@ function setStoredAuthToken(token) {
     }
 }
 
-function setupAuthListeners() {
-    if (el.btnDemoLogin) {
-        el.btnDemoLogin.onclick = handleDemoLogin;
+// Global fetch interceptor: automatically add Bearer token to all internal /api/ requests
+const _nativeFetch = window.fetch;
+window.fetch = async function(resource, init = {}) {
+    let url = typeof resource === 'string' ? resource : (resource?.url || '');
+    if (typeof url === 'string' && url.startsWith('/api/') && !url.startsWith('/api/auth/config') && !url.startsWith('/api/auth/google')) {
+        const token = getStoredAuthToken();
+        if (token) {
+            init = init || {};
+            init.headers = init.headers || {};
+            if (init.headers instanceof Headers) {
+                if (!init.headers.has('Authorization')) {
+                    init.headers.append('Authorization', `Bearer ${token}`);
+                }
+            } else if (Array.isArray(init.headers)) {
+                init.headers.push(['Authorization', `Bearer ${token}`]);
+            } else {
+                init.headers['Authorization'] = `Bearer ${token}`;
+            }
+        }
     }
+    const response = await _nativeFetch(resource, init);
+    // If backend returns 401 Unauthorized, automatically invalidate session and show login gate
+    if (response.status === 401 && typeof url === 'string' && url.startsWith('/api/') && !url.startsWith('/api/auth/config') && !url.startsWith('/api/auth/google')) {
+        setStoredAuthToken('');
+        showLoginGate('Phiên làm việc đã kết thúc. Vui lòng đăng nhập lại bằng tài khoản Google.');
+    }
+    return response;
+};
+
+function setupAuthListeners() {
     if (el.btnLogout) {
         el.btnLogout.onclick = handleLogout;
     }
@@ -349,6 +375,12 @@ async function checkAuthAndInit() {
             });
             if (meRes.ok) {
                 const meData = await meRes.json();
+                // Clear any legacy demo token now that official handover is active
+                if (meData.user?.email && meData.user.email.includes('demo')) {
+                    setStoredAuthToken('');
+                    showLoginGate('Hệ thống đã chính thức kích hoạt bảo mật Google. Vui lòng đăng nhập bằng tài khoản @ninhthuan.edu.vn.');
+                    return;
+                }
                 applyAuthenticatedUser(meData.user, token);
                 if (!state.appInitialized) {
                     state.appInitialized = true;
@@ -377,11 +409,6 @@ function showLoginGate(errorMessage = '') {
         el.loginErrorAlert.style.display = 'block';
     } else if (el.loginErrorAlert) {
         el.loginErrorAlert.style.display = 'none';
-    }
-
-    // Setup Demo login button
-    if (el.demoLoginWrapper) {
-        el.demoLoginWrapper.style.display = state.authConfig?.allow_demo_login ? 'block' : 'none';
     }
 
     // Render Google Sign In button if client_id exists
@@ -458,41 +485,6 @@ async function handleGoogleCredentialResponse(response) {
     }
 }
 
-async function handleDemoLogin() {
-    if (el.btnDemoLogin) {
-        el.btnDemoLogin.disabled = true;
-        el.btnDemoLogin.textContent = 'Đang đăng nhập...';
-    }
-    try {
-        const res = await fetch('/api/auth/demo-login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                email: 'giaovien.demo@ninhthuan.edu.vn',
-                name: 'Thầy Cô Giáo Viên (Sở GD&ĐT Ninh Thuận)'
-            })
-        });
-        const data = await res.json();
-        if (!res.ok) {
-            showLoginGate(data.detail || 'Lỗi đăng nhập thử nghiệm.');
-            return;
-        }
-        setStoredAuthToken(data.token);
-        applyAuthenticatedUser(data.user, data.token);
-        if (!state.appInitialized) {
-            state.appInitialized = true;
-            await initApp();
-        }
-    } catch (e) {
-        showLoginGate('Lỗi kết nối demo login: ' + e.message);
-    } finally {
-        if (el.btnDemoLogin) {
-            el.btnDemoLogin.disabled = false;
-            el.btnDemoLogin.textContent = 'Đăng nhập thử nghiệm (Demo BGH)';
-        }
-    }
-}
-window.handleDemoLogin = handleDemoLogin;
 window.handleLogout = handleLogout;
 
 function applyAuthenticatedUser(user, token) {
@@ -501,15 +493,24 @@ function applyAuthenticatedUser(user, token) {
 
     if (el.userProfileBadge && user) {
         el.userProfileBadge.style.display = 'flex';
-        if (el.userDisplayName) el.userDisplayName.textContent = user.name || 'Người dùng';
-        if (el.userDisplayEmail) el.userDisplayEmail.textContent = user.email || '';
+        const displayName = user.name || 'Thầy/Cô Giáo viên';
+        const displayEmail = user.email || '';
+
+        if (el.userDisplayName) {
+            el.userDisplayName.textContent = displayName;
+            el.userDisplayName.title = `${displayName} (${displayEmail})`;
+        }
+        if (el.userDisplayEmail) {
+            el.userDisplayEmail.textContent = displayEmail;
+            el.userDisplayEmail.title = displayEmail;
+        }
         
         if (user.picture && el.userAvatarImg) {
             el.userAvatarImg.src = user.picture;
             el.userAvatarImg.style.display = 'block';
             if (el.userAvatarInitial) el.userAvatarInitial.style.display = 'none';
         } else if (el.userAvatarInitial) {
-            const firstLetter = (user.name || user.email || 'G').charAt(0).toUpperCase();
+            const firstLetter = (displayName || displayEmail || 'G').charAt(0).toUpperCase();
             el.userAvatarInitial.textContent = firstLetter;
             el.userAvatarInitial.style.display = 'flex';
             if (el.userAvatarImg) el.userAvatarImg.style.display = 'none';

@@ -11,23 +11,40 @@ import json
 import base64
 import datetime
 import requests
+import logging
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Header
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Header, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import database
 import excel_parser
 
+# Security logging
+logger = logging.getLogger("tkb_security")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
 app = FastAPI(title="Hệ thống Quản lý & Giám sát Thời khóa biểu THPT")
 
+# OWASP A05: Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+# Hardened CORS policy
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.onrender\.com)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -140,11 +157,30 @@ def get_auth_config():
     return {
         "auth_enabled": auth_active,
         "google_client_id": os.environ.get("GOOGLE_CLIENT_ID", "").strip(),
-        "allow_demo_login": os.environ.get("ALLOW_DEMO_LOGIN", "true").lower() == "true",
+        "allow_demo_login": False,
         "allowed_domains": allowed_domains,
         "is_web": bool(os.environ.get("RENDER") or os.environ.get("PORT")),
         "school_name": "TRƯỜNG THPT NGUYỄN HUỆ"
     }
+
+def require_authenticated_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    if not is_auth_active():
+        return {"name": "Ban Giám Hiệu", "email": "admin@local", "picture": ""}
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Yêu cầu đăng nhập tài khoản Google @ninhthuan.edu.vn để truy cập."
+        )
+    
+    token = authorization.split("Bearer ")[1].strip()
+    user = verify_session_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Phiên làm việc đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại."
+        )
+    return user
 
 @app.post("/api/auth/google")
 def auth_google(payload: GoogleLoginRequest):
@@ -156,15 +192,18 @@ def auth_google(payload: GoogleLoginRequest):
         }
     user_info = verify_google_token(payload.credential)
     if not user_info:
+        logger.warning("Xác thực Google thất bại: Token không hợp lệ hoặc đã hết hạn")
         raise HTTPException(status_code=401, detail="Xác thực tài khoản Google không thành công hoặc token đã hết hạn.")
     
     if not is_email_authorized(user_info["email"]):
+        logger.warning("Từ chối truy cập: Email '%s' không thuộc miền ninhthuan.edu.vn", user_info["email"])
         raise HTTPException(
             status_code=403,
             detail=f"Email '{user_info['email']}' không thuộc tên miền ngành Giáo dục Ninh Thuận (@ninhthuan.edu.vn). Vui lòng đăng nhập bằng email công vụ do ngành/trường cấp."
         )
     
     token = create_session_token(user_info)
+    logger.info("Người dùng đăng nhập thành công: %s (%s)", user_info.get("name"), user_info.get("email"))
     return {
         "success": True,
         "token": token,
@@ -172,23 +211,12 @@ def auth_google(payload: GoogleLoginRequest):
     }
 
 @app.post("/api/auth/demo-login")
-def auth_demo(payload: DemoLoginRequest):
-    allow_demo = os.environ.get("ALLOW_DEMO_LOGIN", "true").lower() == "true"
-    if not allow_demo and is_auth_active():
-        raise HTTPException(status_code=403, detail="Chế độ đăng nhập thử nghiệm đã tắt trên máy chủ này.")
-    
-    demo_user = {
-        "email": payload.email.lower() if payload.email else "giaovien.demo@thptnguyenhue.edu.vn",
-        "name": payload.name or "Thầy Cô Giáo Viên (Demo)",
-        "picture": "",
-        "sub": "demo-user-id"
-    }
-    token = create_session_token(demo_user)
-    return {
-        "success": True,
-        "token": token,
-        "user": demo_user
-    }
+def auth_demo(payload: Optional[DemoLoginRequest] = None):
+    logger.warning("Cố gắng đăng nhập demo nhưng tính năng đã bị vô hiệu hóa vì hệ thống đã bàn giao chính thức.")
+    raise HTTPException(
+        status_code=403,
+        detail="Hệ thống đã chính thức bàn giao. Chế độ đăng nhập thử nghiệm đã bị vô hiệu hóa hoàn toàn."
+    )
 
 @app.get("/api/auth/me")
 def auth_me(authorization: Optional[str] = Header(None)):
@@ -487,15 +515,23 @@ def get_teacher_schedule(teacher_id: int):
     return res
 
 class UpdatePhoneRequest(BaseModel):
-    phone: str
+    phone: str = Field("", max_length=20)
 
 @app.post("/api/teacher/{teacher_id}/phone")
-def update_teacher_phone_api(teacher_id: int, req: UpdatePhoneRequest):
+def update_teacher_phone_api(
+    teacher_id: int, 
+    req: UpdatePhoneRequest,
+    current_user: Dict[str, Any] = Depends(require_authenticated_user)
+):
     try:
-        database.update_teacher_phone(teacher_id, req.phone)
+        clean_phone = req.phone.strip()
+        database.update_teacher_phone(teacher_id, clean_phone)
+        logger.info("Người dùng %s cập nhật SĐT cho GV ID %d: %s", 
+                    current_user.get("email"), teacher_id, clean_phone or "Đã xóa")
         return {"success": True, "message": "Cập nhật số điện thoại thành công!"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Lỗi cập nhật SĐT: %s", e)
+        raise HTTPException(status_code=500, detail="Không thể cập nhật số điện thoại.")
 
 # API: Subjects
 @app.get("/api/subjects")
@@ -518,67 +554,92 @@ def get_bell_schedule():
     return database.get_bell_schedule()
 
 class BellScheduleItem(BaseModel):
-    session: str
-    period: int
-    start_time: str
-    end_time: str
+    session: str = Field(..., pattern="^(sang|chieu)$")
+    period: int = Field(..., ge=1, le=5)
+    start_time: str = Field(..., max_length=10)
+    end_time: str = Field(..., max_length=10)
     label: Optional[str] = ""
 
 @app.post("/api/bell-schedule")
-def update_bell_schedule(items: List[BellScheduleItem]):
+def update_bell_schedule(
+    items: List[BellScheduleItem],
+    current_user: Dict[str, Any] = Depends(require_authenticated_user)
+):
     try:
         dict_items = [item.dict() for item in items]
         database.update_bell_schedule(dict_items)
+        logger.info("Người dùng %s đã cập nhật toàn bộ khung giờ học", current_user.get("email"))
         return {"success": True, "message": "Cập nhật toàn bộ khung giờ thành công!"}
     except Exception as e:
+        logger.error("Lỗi cập nhật khung giờ: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/bell-schedule/period")
-def update_single_bell_schedule(item: BellScheduleItem):
+def update_single_bell_schedule(
+    item: BellScheduleItem,
+    current_user: Dict[str, Any] = Depends(require_authenticated_user)
+):
     try:
         dict_item = item.dict()
         if not dict_item.get('label'):
             s_name = 'Sáng' if dict_item['session'] == 'sang' else 'Chiều'
             dict_item['label'] = f"Tiết {dict_item['period']} {s_name}"
         database.update_bell_schedule([dict_item])
+        logger.info("Người dùng %s đã cập nhật khung giờ %s", current_user.get("email"), dict_item.get("label"))
         return {"success": True, "message": f"Cập nhật khung giờ {dict_item['label']} ({dict_item['start_time']} - {dict_item['end_time']}) thành công!"}
     except Exception as e:
+        logger.error("Lỗi cập nhật tiết học: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/bell-schedule/reset")
-def reset_bell_schedule():
+def reset_bell_schedule(current_user: Dict[str, Any] = Depends(require_authenticated_user)):
     try:
         database.reset_bell_schedule_to_default()
+        logger.info("Người dùng %s đã khôi phục khung giờ học mặc định", current_user.get("email"))
         return {"success": True, "message": "Đã khôi phục khung giờ chuẩn mặc định thành công!"}
     except Exception as e:
+        logger.error("Lỗi đặt lại khung giờ: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
+# Maximum upload limit: 15 MB
+MAX_UPLOAD_SIZE = 15 * 1024 * 1024
 
 # API: Upload Excel
 @app.post("/api/upload")
-async def upload_timetable_file(file: UploadFile = File(...)):
-    if not (file.filename.endswith(".xlsx") or file.filename.endswith(".xls")):
+async def upload_timetable_file(
+    file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(require_authenticated_user)
+):
+    safe_filename = os.path.basename(file.filename or "")
+    if not (safe_filename.lower().endswith(".xlsx") or safe_filename.lower().endswith(".xls")):
         raise HTTPException(status_code=400, detail="Chỉ hỗ trợ file định dạng Excel (.xlsx, .xls)")
         
-    # Save temporary file
+    content = await file.read(MAX_UPLOAD_SIZE + 1024)
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File tải lên vượt quá dung lượng tối đa cho phép (15MB).")
+    
+    # Validate magic bytes for ZIP/PK (xlsx) or OLE (xls)
+    if not (content.startswith(b"PK\x03\x04") or content.startswith(b"\xd0\xcf\x11\xe0")):
+        raise HTTPException(status_code=400, detail="Nội dung file không phải tệp tin Excel hợp lệ.")
+        
     temp_dir = tempfile.mkdtemp()
-    temp_file_path = os.path.join(temp_dir, file.filename)
+    temp_file_path = os.path.join(temp_dir, safe_filename)
     try:
         with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(content)
             
-        # Parse Excel
         parsed_data = excel_parser.parse_timetable_file(temp_file_path)
         
         if not parsed_data['teachers']:
-            raise HTTPException(status_code=400, detail="Không tìm thấy danh sách giáo viên hoặc bảng thời khóa biểu có từ khóa hợp lệ trong file Excel")
+            raise HTTPException(status_code=400, detail="Không tìm thấy danh sách giáo viên hoặc bảng thời khóa biểu có từ khóa hợp lệ trong file Excel.")
             
-        # Save to database
         database.save_timetable_data(parsed_data)
         
-        # Also backup as current TKB file
         backup_path = "TKB_HIENTHOI.xlsx"
         shutil.copyfile(temp_file_path, backup_path)
+        
+        logger.info("Người dùng %s nạp file TKB thành công: %s (%d GV, %d tiết)", 
+                    current_user.get("email"), safe_filename, len(parsed_data['teachers']), len(parsed_data['entries']))
         
         return {
             "success": True,
@@ -588,7 +649,10 @@ async def upload_timetable_file(file: UploadFile = File(...)):
             "entries_count": len(parsed_data['entries']),
             "classes_count": len(parsed_data['classes'])
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error("Lỗi khi đọc file TKB: %s", e)
         raise HTTPException(status_code=500, detail=f"Lỗi khi đọc file: {str(e)}")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
