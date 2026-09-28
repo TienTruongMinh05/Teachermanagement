@@ -422,9 +422,8 @@ function renderGoogleSignInButton() {
 
     if (!clientId) {
         container.innerHTML = `
-            <div style="font-size: 12.5px; color: #475569; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px dashed #cbd5e1; max-width: 320px; margin: 0 auto;">
-                Chưa cài đặt Google Client ID trên Cloud.<br>
-                <small style="color: #0284c7;">Thầy có thể bấm nút <strong>Đăng nhập thử nghiệm</strong> bên dưới để vào hệ thống ngay.</small>
+            <div style="font-size: 13px; color: #475569; background: #f8fafc; padding: 12px 16px; border-radius: 8px; border: 1px dashed #cbd5e1; max-width: 320px; margin: 0 auto; text-align: center;">
+                Đang nạp chứng nhận xác thực Google...
             </div>
         `;
         return;
@@ -433,11 +432,20 @@ function renderGoogleSignInButton() {
     function tryRenderGIS() {
         if (window.google && google.accounts && google.accounts.id) {
             try {
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent) || window.innerWidth <= 768;
                 const gisConfig = {
                     client_id: clientId,
-                    callback: handleGoogleCredentialResponse,
                     auto_select: false
                 };
+
+                if (isMobile) {
+                    gisConfig.ux_mode = 'redirect';
+                    gisConfig.login_uri = window.location.origin + '/api/auth/google-callback';
+                } else {
+                    gisConfig.ux_mode = 'popup';
+                    gisConfig.callback = handleGoogleCredentialResponse;
+                }
+
                 google.accounts.id.initialize(gisConfig);
                 container.innerHTML = '';
                 google.accounts.id.renderButton(container, {
@@ -446,7 +454,7 @@ function renderGoogleSignInButton() {
                     text: 'signin_with',
                     shape: 'rectangular',
                     logo_alignment: 'left',
-                    width: 280
+                    width: isMobile ? 260 : 280
                 });
             } catch (err) {
                 console.error('Lỗi khởi tạo Google GIS:', err);

@@ -206,6 +206,89 @@ def auth_google(payload: GoogleLoginRequest):
         "user": user_info
     }
 
+@app.api_route("/api/auth/google-callback", methods=["GET", "POST"])
+def auth_google_callback(credential: Optional[str] = Form(None), g_csrf_token: Optional[str] = Form(None)):
+    if not is_auth_active():
+        return HTMLResponse("<script>window.location.href='/';</script>")
+    
+    if not credential:
+        return HTMLResponse("<script>window.location.href='/';</script>")
+        
+    user_info = verify_google_token(credential)
+    if not user_info:
+        logger.warning("Google Mobile Callback thất bại: Token không hợp lệ")
+        return HTMLResponse("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset='utf-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                <title>Lỗi xác thực Google</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 40px 20px; background: #f8fafc; color: #1e293b; }
+                    .card { background: white; max-width: 400px; margin: 0 auto; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+                    .btn { display: inline-block; margin-top: 16px; background: #0284c7; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; }
+                </style>
+            </head>
+            <body>
+                <div class='card'>
+                    <h3 style='color: #e11d48; margin-top: 0;'>Xác thực không thành công</h3>
+                    <p style='font-size: 14px; color: #475569;'>Token xác thực từ Google không hợp lệ hoặc đã hết hạn.</p>
+                    <a href='/' class='btn'>Thử đăng nhập lại</a>
+                </div>
+            </body>
+            </html>
+        """, status_code=401)
+    
+    if not is_email_authorized(user_info["email"]):
+        logger.warning("Google Mobile Callback bị từ chối: Email '%s' không thuộc ninhthuan.edu.vn", user_info["email"])
+        return HTMLResponse(f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset='utf-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                <title>Truy cập bị từ chối</title>
+                <style>
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 40px 20px; background: #f8fafc; color: #1e293b; }}
+                    .card {{ background: white; max-width: 400px; margin: 0 auto; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
+                    .btn {{ display: inline-block; margin-top: 16px; background: #0284c7; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; }}
+                </style>
+            </head>
+            <body>
+                <div class='card'>
+                    <h3 style='color: #e11d48; margin-top: 0;'>Từ chối truy cập</h3>
+                    <p style='font-size: 14px; color: #475569;'>Email <strong>{user_info["email"]}</strong> không thuộc tên miền ngành Giáo dục Ninh Thuận (<strong>@ninhthuan.edu.vn</strong>).</p>
+                    <a href='/' class='btn'>Thử lại bằng email công vụ</a>
+                </div>
+            </body>
+            </html>
+        """, status_code=403)
+    
+    token = create_session_token(user_info)
+    logger.info("Đăng nhập Mobile (Redirect) thành công: %s (%s)", user_info.get("name"), user_info.get("email"))
+    
+    return HTMLResponse(f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <title>Đang đăng nhập...</title>
+        </head>
+        <body style='font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding-top: 60px; background: #0f172a; color: white;'>
+            <div style='max-width: 300px; margin: 0 auto; padding: 20px; background: #1e293b; border-radius: 12px; border: 1px solid #334155;'>
+                <p style='margin: 0; font-weight: 600; color: #38bdf8;'>Xác thực thành công!</p>
+                <p style='font-size: 13px; color: #94a3b8; margin-top: 8px;'>Đang chuyển hướng về trang thời khóa biểu...</p>
+            </div>
+            <script>
+                localStorage.setItem('tkb_jwt_token', '{token}');
+                window.location.href = '/';
+            </script>
+        </body>
+        </html>
+    """)
+
 @app.post("/api/auth/demo-login")
 def auth_demo():
     logger.warning("Cố gắng đăng nhập demo nhưng tính năng đã bị vô hiệu hóa vì hệ thống đã bàn giao chính thức.")
