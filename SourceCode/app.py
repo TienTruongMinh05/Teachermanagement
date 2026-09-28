@@ -130,7 +130,7 @@ def health_check():
     return {
         "status": "healthy",
         "service": "tkb-thpt-nguyenhue",
-        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "timestamp": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7))).strftime("%Y-%m-%d %H:%M:%S")
     }
 
 @app.get("/api/auth/config")

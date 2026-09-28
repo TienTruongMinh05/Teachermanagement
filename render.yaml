@@ -10,6 +10,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: TZ
+        value: "Asia/Ho_Chi_Minh"
       - key: AUTH_ENABLED
         value: "true"
       - key: ALLOW_DEMO_LOGIN

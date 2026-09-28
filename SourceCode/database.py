@@ -136,7 +136,7 @@ def save_timetable_data(data: Dict[str, Any]):
             cursor.execute('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)', (k, str(v)))
             
         cursor.execute('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)', 
-                       ('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                       ('last_updated', get_vn_now().strftime('%Y-%m-%d %H:%M:%S')))
         
         # Preserve existing phone numbers if any
         cursor.execute('SELECT full_name, phone FROM teachers WHERE phone IS NOT NULL AND phone != ""')
@@ -240,13 +240,20 @@ def reset_bell_schedule_to_default():
     conn.commit()
     conn.close()
 
+VN_TZ = datetime.timezone(datetime.timedelta(hours=7))
+
+def get_vn_now() -> datetime.datetime:
+    return datetime.datetime.now(VN_TZ)
+
 def determine_current_period(dt: Optional[datetime.datetime] = None) -> Dict[str, Any]:
     """
     Determine what period is currently active based on current time or provided datetime.
     Day of week: Monday=2, Tuesday=3, ..., Saturday=7, Sunday=8.
     """
     if dt is None:
-        dt = datetime.datetime.now()
+        dt = get_vn_now()
+    elif dt.tzinfo is None:
+        dt = dt.replace(tzinfo=VN_TZ)
         
     weekday = dt.weekday() # 0 = Monday, ..., 5 = Saturday, 6 = Sunday
     vn_day = weekday + 2   # 2 = Thứ 2, ..., 7 = Thứ 7, 8 = Chủ nhật
