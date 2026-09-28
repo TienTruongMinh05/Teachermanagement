@@ -136,10 +136,6 @@ def is_email_authorized(email: str) -> bool:
 class GoogleLoginRequest(BaseModel):
     credential: str
 
-class DemoLoginRequest(BaseModel):
-    email: Optional[str] = "giaovien.demo@ninhthuan.edu.vn"
-    name: Optional[str] = "Thầy Cô (Demo - Sở GD&ĐT Ninh Thuận)"
-
 # Health check endpoints (for UptimeRobot / Render keep-alive / Monitoring)
 @app.api_route("/health", methods=["GET", "HEAD"])
 @app.api_route("/api/health", methods=["GET", "HEAD"])
@@ -211,7 +207,7 @@ def auth_google(payload: GoogleLoginRequest):
     }
 
 @app.post("/api/auth/demo-login")
-def auth_demo(payload: Optional[DemoLoginRequest] = None):
+def auth_demo():
     logger.warning("Cố gắng đăng nhập demo nhưng tính năng đã bị vô hiệu hóa vì hệ thống đã bàn giao chính thức.")
     raise HTTPException(
         status_code=403,

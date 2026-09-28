@@ -10,3 +10,14 @@ QuanLyGiaoVien.exe
 QuanLyGiaoVien.zip
 backup/
 .env
+.venv/
+env/
+venv/
+*.tmp
+*.log
+scratch*
+.DS_Store
+Thumbs.db
+/tkb_database.db
+/TKB_HIENTHOI.xlsx
+
